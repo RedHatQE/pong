@@ -13,7 +13,7 @@ SKIP = "SKIP"
 STATUS_MAP = {"PASS": PASS, "FAIL": FAIL, "SKIP": SKIP}
 DEFAULT_WORKSPACE = "/home/jenkins/workspace"
 DEFAULT_JENKINS_PROJECT = "stoner_gui_test_polarion"
-DEFAULT_RESULT_PATH = "test_output/testng-results.xml"
+DEFAULT_RESULT_PATH = "test_output/polarion_testng-results.xml"
 
 TC_KEYS = {"caseimportance": "high", "caselevel": "component", "caseposneg": "positive",
            "testtype": "functional", "subtype1": "reliability", "caseautomation": "automated"}
@@ -32,7 +32,7 @@ def get_class_methodname(s):
     return klass, methodname
 
 
-def query_test_case(query, fields=None):
+def query_test_case(query, fields=None, **kwargs):
     """
     Returns a list of pylarion TestCase objects
 
@@ -43,7 +43,7 @@ def query_test_case(query, fields=None):
     """
     if fields is None:
         fields = ["work_item_id", "title"]
-    return PylTestCase.query(query, fields=fields)
+    return PylTestCase.query(query, fields=fields, **kwargs)
 
 
 def get_default_project():
@@ -88,7 +88,8 @@ def get_latest_test_run(test_run_name):
     :param test_run_name: test run id string
     :return: TestRun
     """
-    s = TestRun.search('"{}"'.format(test_run_name), fields=["test_run_id", "created"],
+    s = TestRun.search('"{}"'.format(test_run_name),
+                       fields=["test_run_id", "created", "status"],
                        sort="created")
     return itz.last(s) if s else None
 

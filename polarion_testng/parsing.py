@@ -1,9 +1,9 @@
 import xml.etree.ElementTree as ET
 
-from testng.core import TestIterationResult, TestNGToPolarion
-from testng.decorators import fixme
-from testng.logger import log
-from testng.utils import *
+from polarion_testng.core import TestIterationResult, TestNGToPolarion
+from polarion_testng.decorators import fixme
+from polarion_testng.logger import log
+from polarion_testng.utils import *
 
 
 def get_data_provider_elements(elem):
@@ -105,7 +105,7 @@ def add_step(steps, title, attrs, new_row, exception=None, output=None,
 @fixme("parsing needs to change how it gets TestSteps (data providers are not TestStep based anymore)")
 def parse_results(result_path, get_output=False):
     """
-    This is the main function which parses the testng-results.xml file and creates a dictionary of
+    This is the main function which parses the polarion_testng-results.xml file and creates a dictionary of
     test case title -> list of {attributes (result of testmethod) and args (the arguments for this step)}
 
     :param result_path:
@@ -172,15 +172,16 @@ def parse_results(result_path, get_output=False):
 
 def parser(result_path, get_output=False):
     """
-    This is the main function which parses the testng-results.xml file and creates a dictionary of
-    test case title -> list of {attributes (result of testmethod) and args (the arguments for this step)}
+    This is the main function which parses the polarion_testng-results.xml file and creates a dictionary of
+    test case title -> list of {attributes: (result of testmethod),
+                                args: (the arguments for this step)}
 
     :param result_path:
     :return:
     """
+    log.info("Starting parse of xml result file...")
     tree = ET.parse(result_path)
     root = tree.getroot()
-    # test_cases = {}
     titles = set()
     tests = []
 
@@ -193,6 +194,7 @@ def parser(result_path, get_output=False):
         testng = None
 
         last_test_method = None
+        iteration = 1
         for test_method in klass:
             attribs = test_method.attrib
             attrs = attribs
@@ -212,11 +214,16 @@ def parser(result_path, get_output=False):
                 for match in matches:
                     _, methodname = get_class_methodname(match.title)
                     if str(methodname) == str(method_name):
-                        log.info("Found existing TestCase: {}".format(match.title))
+                        log.info("Found existing TestCase in Polarion: {}".format(match.title))
                         ptc = PylTestCase(uri=match.uri)
+                        iteration = 1
                         break
+                else:
+                    log.info("No matching TestCase in Polarion was found")
 
-            log.info("Parsing {}.{} {}".format(class_name, method_name, attribs['started-at']))
+            template = "\tIteration {}: parsing {}.{} {}"
+            log.info(template.format(iteration, class_name, method_name, attribs['started-at']))
+            iteration += 1
             test_case_title = class_name + "." + method_name
 
             # If we have data-provider elements, we need to grab all the params
@@ -232,4 +239,5 @@ def parser(result_path, get_output=False):
                 tests.append(testng)
             else:
                 testng.step_results.append(result)
+    log.info("End parsing of xml results file")
     return tests

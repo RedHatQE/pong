@@ -15,16 +15,36 @@ Parses a testng-results.xml file and
 6. For each Test Case, create a matching Test Record
 
 """
-from testng.logger import log
-from testng.utils import *
-from testng.decorators import retry, profile
-from testng.parsing import parser
+import sys
+import toolz
+
+from polarion_testng.logger import log
+from polarion_testng.utils import *
+from polarion_testng.decorators import retry, profile
+from polarion_testng.parsing import parser
 
 # Jenkins created environment variables
 if 0:
     WORKSPACE = os.environ["WORKSPACE"]
     TEST_RUN_TEMPLATE = os.environ["TEST_RUN_TEMPLATE"]
-    TESTNG_RESULTS_PATH = os.path.join(WORKSPACE, "test-output/testng-results.xml")
+    TESTNG_RESULTS_PATH = os.path.join(WORKSPACE, "test-output/polarion_testng-results.xml")
+
+
+def fltr(obj, f):
+        result = False
+        try:
+            no_under = not f.startswith("_")
+            attrib = getattr(obj, f)
+            return no_under and (attrib and not callable(attrib))
+        except AttributeError:
+            pass
+        except TypeError:
+            pass
+        return result
+
+
+def print_tr(obj, fld):
+    print fld, "=", getattr(obj, fld)
 
 
 class Suite(object):
@@ -38,6 +58,8 @@ class Suite(object):
         self._project = project
 
         not_skipped = filter(lambda x: x.status != SKIP, self.tests)
+        # TODO: It would be nice to have show which Tests got skipped due to dependency on another
+        # test that failed, or because of a BZ blocker
         for test_case in not_skipped:
             desc = test_case.description
             title = test_case.title
@@ -134,10 +156,54 @@ class Suite(object):
 
 
 if __name__ == "__main__":
+    import hy
+    import polarion_testng.cli as cli
+
+    parse_arg = cli.gen_argparse()
+    args = parse_arg.parse_args()
+
+    results_path = args.result_path
+    project_id = args.project_id or get_default_project()
+    template_id = args.template_id  # eg "sean toner test template"
+    testrun_id = args.testrun_id    # eg "pylarion exporter testing"
+    gen_only = args.generate_only
+    update_id = args.update_run
+
+    # CLI options that will quit if not None
+    query_testcase = args.query_testcase
+    get_default_projectid = args.get_default_projectid
+    get_latest_testrun = args.get_latest_testrun
+
+    # FIXME:  Turn these into functions and decorate them
+    if query_testcase:
+        tests = query_test_case(query_testcase)
+        for test in tests:
+            #test = PylTestCase(uri=t.uri)
+            msg = test.work_item_id + " " + test.title
+            log.info(msg)
+    if get_default_projectid:
+        log.info(get_default_project())
+    if get_latest_testrun:
+        tr = get_latest_test_run(testrun_id)
+
+        valid = toolz.partial(fltr, tr)
+        fields = filter(valid, dir(tr))
+
+        for attr in fields:
+            print_tr(tr, attr)
+    if any([query_testcase, get_default_projectid, get_latest_testrun]):
+        sys.exit(0)
+
     # Will auto-generate polarion TestCases
-    suite = Suite("/home/stoner/Documents/testng/testng-results.xml")
-    # If you already have a TestRun, you can update it
-    # tr = Suite.get_test_run(tr_id)
-    # suite.update_test_run(tr)
+    suite = Suite(results_path)
+
     # Once the suite object has been initialized, generate a test run with associated test records
-    suite.create_test_run("sean toner test template", "pylarion exporter testing")
+    if not gen_only:
+        if update_id:
+            tr = Suite.get_test_run(update_id)
+            log.info("Updating existing test run...")
+            suite.update_test_run(tr)
+        else:
+            log.info("Creating new TestRun...")
+            suite.create_test_run(template_id, testrun_id)
+    log.info("TestRun information completed to Polarion")

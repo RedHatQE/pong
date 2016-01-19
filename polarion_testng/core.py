@@ -1,10 +1,10 @@
-from testng.utils import *
+from polarion_testng.utils import *
 from pylarion.work_item import TestSteps as PylTestSteps
 from pylarion.work_item import TestStep as PylTestStep
 
-from testng.logger import log
+from polarion_testng.logger import log
 import datetime
-from testng.decorators import profile
+from polarion_testng.decorators import profile
 
 
 class TestIterationResult(object):
@@ -155,7 +155,7 @@ class TestNGToPolarion(object):
     @profile
     def create_polarion_tc(self):
         """
-        Given the testng.TestCase, convert it to the equivalent pylarion.work_item.TestCase
+        Given the polarion_testng.TestCase, convert it to the equivalent pylarion.work_item.TestCase
         """
         # Check to see if we already have an existing test case
         if self.polarion_tc:
@@ -178,7 +178,6 @@ class TestNGToPolarion(object):
                 step = self.make_polarion_test_step()
                 tc.set_test_steps([step])
         else:
-
             tc = PylTestCase.create(self.project, self.title, self.description, **TC_KEYS)
 
             # Create PylTestSteps if needed and add it

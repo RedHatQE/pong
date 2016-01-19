@@ -1,0 +1,5 @@
+toolz
+python-logstash
+suds
+requests
+hy

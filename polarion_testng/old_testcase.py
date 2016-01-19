@@ -24,11 +24,11 @@ from pylarion.test_record import TestRecord
 
 import copy
 import hashlib
-from testng.logger import log
+from polarion_testng.logger import log
 import datetime
 
-from testng.decorators import profile
-from testng.utils import *
+from polarion_testng.decorators import profile
+from polarion_testng.utils import *
 
 
 class ParseException(Exception):
@@ -86,7 +86,7 @@ class TestCase(object):
     Representation of the execution of a test in TestNG
 
     This class really represents several things:
-    1. Parsed results from the testng-results.xml (the <test-method> element)
+    1. Parsed results from the polarion_testng-results.xml (the <test-method> element)
     2. A means to create a Polarion Test Case given this object information
     3. A means to create a TestRecord in Polarion given this object's information
     """
@@ -176,7 +176,7 @@ class TestCase(object):
     @property
     def description(self):
         """
-        Retrieves a description from the parsed testng-results.xml for the test
+        Retrieves a description from the parsed polarion_testng-results.xml for the test
 
         In TestNG, a possible field for the @Test annotation is 'description'.  The
         parser will read in this attribute from the xml so that it can be used to
@@ -313,7 +313,7 @@ class TestCase(object):
 
     def create_polarion_tc(self):
         """
-        Given the testng.TestCase, convert it to the equivalent pylarion.work_item.TestCase
+        Given the polarion_testng.TestCase, convert it to the equivalent pylarion.work_item.TestCase
         """
         # Check to see if we already have an existing test case
         if self.polarion_tc:

@@ -2,7 +2,7 @@ import datetime
 import ssl
 import platform
 from functools import wraps
-from testng.logger import log
+from polarion_testng.logger import log
 
 version = [int(i) for i in platform.python_version_tuple()]
 if version >= [2, 7, 7]:
