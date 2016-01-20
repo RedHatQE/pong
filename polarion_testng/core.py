@@ -31,7 +31,7 @@ class TestNGToPolarion(object):
     ALLOWED_FIELDS = ["name", "status", "signature", "is-config", "duration-ms", "started-at",
                       "finished-at", "description", "data-provider", "depends-on-methods"]
 
-    def __init__(self, attrs, title, test_case=None, result=None, params=None, project=None):
+    def __init__(self, attrs, title, test_case=None, result=None, params=None, project=None, requirement=None):
         self.title = title
         self.attributes = attrs
         self.description = "" if "description" not in attrs else attrs["description"]
@@ -43,6 +43,7 @@ class TestNGToPolarion(object):
         self._status = None
         self.project = get_default_project() if project is None else project
         self._author = None
+        self.requirement = requirement
 
     @property
     def status(self):

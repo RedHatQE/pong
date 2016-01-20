@@ -5,6 +5,9 @@ from polarion_testng.decorators import fixme
 from polarion_testng.logger import log
 from polarion_testng.utils import *
 
+import hy
+import polarion_testng.requirement as preq
+
 
 def get_data_provider_elements(elem):
     """
@@ -102,6 +105,8 @@ def add_step(steps, title, attrs, new_row, exception=None, output=None,
         steps[title]["steps"].append(step)
 
 
+
+
 @fixme("parsing needs to change how it gets TestSteps (data providers are not TestStep based anymore)")
 def parse_results(result_path, get_output=False):
     """
@@ -125,7 +130,6 @@ def parse_results(result_path, get_output=False):
         last_test_method = None
         for test_method in klass:
             attribs = test_method.attrib
-            attrs = attribs
 
             # if this is an is-config method, skip it
             if "is-config" in attribs and attribs["is-config"] == "true":
@@ -164,9 +168,9 @@ def parse_results(result_path, get_output=False):
                 steps = ["Arg{}: {}".format(i, stringify_arg(arg))
                          for i, arg in enumerate(args)]
                 string_steps = ", ".join(steps)
-                add_step(test_cases, test_case_title, attrs, string_steps, **kwds)
+                add_step(test_cases, test_case_title, attribs, string_steps, **kwds)
             else:
-                add_step(test_cases, test_case_title, attrs, None, **kwds)
+                add_step(test_cases, test_case_title, attribs, None, **kwds)
     return test_cases
 
 
@@ -241,3 +245,159 @@ def parser(result_path, get_output=False):
                 testng.step_results.append(result)
     log.info("End parsing of xml results file")
     return tests
+
+
+class Parser(object):
+    """
+    Parses the testng-results.xml file
+
+    A model of the testng-results.xml::
+
+      <suite>
+        <test name="GUI: Registration ...>
+          <class name=rhsm.gui.tests.register_tests ...>
+            <test-method name=simple_register status=FAIL data-provider=userowners ...>
+            <test-method name=unregister status=PASS ...>
+          </class>
+        </test>
+      </suite>
+
+    An object of this class is used to do the following:
+    1) For each <suite>, get the <test> elements, and generate a Requirement if needed based on name
+       - For each <class> in <test>, and for each <test-method> in <class>...
+         - Generate a TestCase if needed, and link to the Requirement of the <test>
+    """
+    def __init__(self, project_id, results_path, template_id, requirement_prefix=TEST_REQUIREMENT_PREFIX,
+                 testrun_prefix="", distro=None):
+        self.testrun_prefix = testrun_prefix
+        self.distro = distro
+        self.template_id = template_id
+        self.results_path = results_path
+        self.project_id = project_id
+        self.requirement_prefix = requirement_prefix
+
+    @staticmethod
+    def parse_by_element(result_path, element):
+        tree = ET.parse(result_path)
+        root = tree.getroot()
+        return root.iter(element)
+
+    def parse_suite(self, suite, req_prefix=TEST_REQUIREMENT_PREFIX):
+        """
+        Gets all the <test> elements, and generates a Requirement if needed, then grabs all the <class> elements
+        generating (or updating) a TestCase if needed.
+
+        :param suite:
+        :param req_prefix:
+        :return:
+        """
+        for test in suite.iter("test"):
+            attributes = test.attrib
+            test_name = testify_requirement_name(attributes["name"], prefix=req_prefix)
+
+            # First, check to see if we've got a requirement with this name, and if not, create one
+            query = title_query(test_name)
+            req = preq.is_requirement_exists(test_name)
+            if not req:
+                # TODO: Generate a new requirement
+                requirement = preq.create_requirement()
+                pass
+            else:
+                # make sure we've got an exact match
+                pass
+
+    def parse_tests(self, suite):
+        """
+        This is the main function which parses the polarion_testng-results.xml file and creates a dictionary of
+        test case title -> list of {attributes: (result of testmethod),
+                                    args: (the arguments for this step)}
+
+
+        :param req_prefix:
+        :param suite:
+        :return:
+        """
+        log.info("Getting tests from suite...")
+        titles = set()
+        tests = []
+
+        for test in suite.iter("test"):
+            attributes = test.attrib
+            requirement_name = testify_requirement_name(attributes["name"], prefix=self.requirement_prefix)
+
+            # First, check to see if we've got a requirement with this name, and if not, create one
+            query = title_query(requirement_name)
+            req = query_requirement(query)
+
+            if not req:
+                req = preq.create_requirement(self.project_id, requirement_name)
+
+            self.parse_test_methods(test, titles=titles, tests=tests, requirement=req)
+
+        log.info("End parsing of xml results file")
+        return tests
+
+    @staticmethod
+    def parse_test_methods(test, titles=None, tests=None, requirement=None):
+        if titles is None:
+            titles = set()
+
+        if tests is None:
+            tests = []
+
+        for klass in test.iter("class"):
+            class_name = klass.attrib["name"]
+            query = "title:{}*".format(class_name)
+            log.info("Querying Polarion for: {}".format(query))
+            matches = query_test_case(query)
+            ptc = None
+            testng = None
+
+            last_test_method = None
+            iteration = 1
+            for test_method in klass:
+                attribs = test_method.attrib
+                attrs = attribs
+
+                # if this is an is-config method, skip it
+                if "is-config" in attribs and attribs["is-config"] == "true":
+                    continue
+
+                method_name = attribs["name"]
+                if last_test_method is None:
+                    last_test_method = method_name
+                elif method_name != last_test_method:
+                    ptc = None
+                    last_test_method = method_name
+
+                if ptc is None:
+                    for match in matches:
+                        _, methodname = get_class_methodname(match.title)
+                        if str(methodname) == str(method_name):
+                            log.info("Found existing TestCase in Polarion: {}".format(match.title))
+                            ptc = PylTestCase(uri=match.uri)
+                            iteration = 1
+                            break
+                    else:
+                        log.info("No matching TestCase in Polarion was found")
+
+                template = "\tIteration {}: parsing {}.{} {}"
+                log.info(template.format(iteration, class_name, method_name, attribs['started-at']))
+                iteration += 1
+                test_case_title = class_name + "." + method_name
+
+                # If we have data-provider elements, we need to grab all the params
+                args = None
+                if 'data-provider' in attribs:
+                    args = get_data_provider_elements(test_method)
+
+                result = TestIterationResult(attrs, params=args, exception=get_exception(test_method))
+                if test_case_title not in titles:
+                    testng = TestNGToPolarion(attrs, title=test_case_title, test_case=ptc,
+                                              result=result, params=args, requirement=requirement)
+                    titles.add(test_case_title)
+                    tests.append(testng)
+                else:
+                    testng.step_results.append(result)
+
+        return titles, tests

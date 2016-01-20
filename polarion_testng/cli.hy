@@ -37,6 +37,25 @@
     parser))
 
 
+(defn only-pretty-polarion
+  [obj field]
+  (let [result False]
+    (try
+     (let [no-under (.startswith field "_")
+           attrib (getattr obj field)]
+       (setv result (and no-under (and attrib
+                                       (not (callable attrib))))))
+     (except [ae AttributeError]
+       (setv result  False))
+     (except [te TypeError]
+       (setv result  False)))
+    result))
+
+(defn print-kv
+  [obj field]
+  (print field "=" (getattr obj field)))
+
+
 (defn query-testcase
   [query]
   (for [test (query-test-case query)]
@@ -45,8 +64,17 @@
 
 
 (defn get-default-projectid
-  [orig ]
-  )
+  [orig]
+  (.info log (get-default-project)))
+
+
+(defn get-latest-testrun
+  [testrun-id]
+  (let [tr (get-latest-test-run testrun-id)
+        valid (.partial toolz only-pretty-polarion tr)
+        fields (filter valid (dir tr))]
+    (for [attr fields]
+      (print-kv tr attr))))
 
 
 ;; Sets the .pylarion file to use 
@@ -70,7 +98,7 @@
                       (+ orig ".bak"))]
     (.copy shutil orig backup-path)))
 (setv create-backup.__doc__
-      (+ "creates a backup copy of original.  if backup is given, it must be the full name" 
+      (+ "creates a backup copy of original.  f backup is given, it must be the full name" 
          " otherwise if backup is not given, the original file name will be appended with .bak"))
 
 

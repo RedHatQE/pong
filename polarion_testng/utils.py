@@ -3,7 +3,9 @@ import os
 import ConfigParser
 
 from toolz import itertoolz as itz
+from toolz import functoolz as ftz
 from pylarion.work_item import TestCase as PylTestCase
+from pylarion.work_item import Requirement
 from pylarion.test_run import TestRun
 
 PYLARION_CONFIG = [os.path.join(os.environ['HOME'], ".pylarion")]
@@ -14,6 +16,7 @@ STATUS_MAP = {"PASS": PASS, "FAIL": FAIL, "SKIP": SKIP}
 DEFAULT_WORKSPACE = "/home/jenkins/workspace"
 DEFAULT_JENKINS_PROJECT = "stoner_gui_test_polarion"
 DEFAULT_RESULT_PATH = "test_output/polarion_testng-results.xml"
+TEST_REQUIREMENT_PREFIX = "RHSM "  # prefix to add to auto generated Requirement title
 
 TC_KEYS = {"caseimportance": "high", "caselevel": "component", "caseposneg": "positive",
            "testtype": "functional", "subtype1": "reliability", "caseautomation": "automated"}
@@ -44,6 +47,41 @@ def query_test_case(query, fields=None, **kwargs):
     if fields is None:
         fields = ["work_item_id", "title"]
     return PylTestCase.query(query, fields=fields, **kwargs)
+
+
+def query_requirement(query, fields=None, **kwargs):
+    """
+    Returns a list of pylarion Requirement objects
+
+    :param query:
+    :param fields:
+    :param kwargs:
+    :return:
+    """
+    if fields is None:
+        fields = ["work_item_id", "title"]
+    return Requirement.query(query, fields=fields, **kwargs)
+
+
+def title_query(q, wild=True):
+    """
+    Helps generate a title query.
+
+    Creates a simpler lucene query, and handles the case where the user might want to have spaces
+    eg::
+
+        query = title_query("RHSM : RCT Tool")
+        print query  # title:"RHSM : RCT Tool"*
+    :param q:
+    :param wild:
+    :return:
+    """
+    title_fmt = 'title:"{}{}"'
+    extra = ""
+    if wild:
+        extra = "*"
+    query = title_fmt.format(q, extra)
+    return query
 
 
 def get_default_project():
@@ -155,3 +193,35 @@ def zero_steps(polarion_tc):
     :return:
     """
     pass
+
+
+def polarion_safe_string(string):
+    """
+    Polarion doesn't like . in a string
+    :param string:
+    :return:
+    """
+    # As we find other characters to replace, add a new
+    # function and compose them
+    def no_dot(s):
+        return s.replace(".", "-")
+
+    def no_newline(s):
+        return s.strip()
+
+    def no_colon(s):
+        return s.replace(":", " ")
+
+    safe = ftz.compose(no_colon, no_dot, no_newline)
+    return safe(string)
+
+
+def testify_requirement_name(test_name, prefix="RHSM "):
+    """
+    Generates a name for a Requirement by taking the <test name=XXX> name attribute, and prefixing with prefix
+
+    :param test_name:
+    :param prefix:
+    :return:
+    """
+    return prefix + test_name
