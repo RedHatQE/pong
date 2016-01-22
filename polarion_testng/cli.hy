@@ -14,7 +14,7 @@
   []
   (let [parser (ArgumentParser)]
     (.add-argument parser "--query-testcase" :help "List test cases only")
-    (.add_argument parser "--get-default-projectid" :help "Display the .pylarion project then quit"
+    (.add_argument parser "--get-default-project-id" :help "Display the .pylarion project then quit"
                    :action "store_true" :default False)
     (.add_argument parser "--set-project-id" :help "Set project id"
                    :choices ["RedHatEnterpriseLinux7" "RHEL6"])
@@ -34,6 +34,21 @@
                                                      update the existing TestRun.  If ID does not 
                                                      exist, use it to create new TestRun ID 
                                                      (this will override -t)")
+    (.add_argument parser "--testrun-prefix" :help "A str prefix to be added before an auto generation
+                                                   Polarion TestRun id.  (defaults to 'RHSM')")
+    (.add_argument parser "--req-prefix" :help "A str prefix to be added to an auto generated Polarion
+                                               Requirement title (defaults to empty string)")
+    (.add_argument parser "--distro" :help "The linux distro tested (defaults to RHEL)"
+                   :default "RHEL")
+    (.add_argument parser "--distro-major" :help "The major version of the distro")
+    (.add_argument parser "--distro-minor" :help "The minor version (if any) of the distro")
+    (.add_argument parser "-a" "--arch" :help "The machine arch being tested (defaults to x86_64)"
+                   :default "x86_64")
+    (.add_argument parser "-V" "--variant" :help "The variant of distro (eg Server, Client)"
+                   :default "Server")
+    (.add_argument parser "-P" "--pylarion-path" :help "path to .pylarion file (defaults to ~/.pylarion")
+    (.add_argument parser "-b" "--base-queries" :help "a sequence of strings to be used as queries"
+                   :nargs "*")
     parser))
 
 
@@ -77,11 +92,11 @@
       (print-kv tr attr))))
 
 
-;; Sets the .pylarion file to use 
+;; Creates a parser to edit the .pylarion file 
 (defn create-cfg-parser
   [&optional path]
   (let [cpath (if (is path None)
-                (.join os.path (.expanduser os.path "~") ".pylarion")
+                (.expanduser os.path "~/.pylarion")
                 path)
         cparser (configparser.ConfigParser)]
     (if (not (.exists os.path cpath))
@@ -105,7 +120,7 @@
 (defn set-project-id
   [dot-pylarion project-id &optional backup-path]
   (create-backup dot-pylarion)
-  (let [cparser (create-cfg-parser :path orig)]
+  (let [cparser (create-cfg-parser :path dot-pylarion)]
     (with [newpy (open dot-pylarion "w")]
           (.set cparser "webservice" "default_project" project-id)
           (.write cparser newpy))))

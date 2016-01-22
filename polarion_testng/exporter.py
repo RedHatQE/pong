@@ -21,13 +21,15 @@ import toolz
 from polarion_testng.logger import log
 from polarion_testng.utils import *
 from polarion_testng.decorators import retry, profile
-from polarion_testng.parsing import parser
+from polarion_testng.parsing import parser, Transformer
 
 # Jenkins created environment variables
 if 0:
     WORKSPACE = os.environ["WORKSPACE"]
     TEST_RUN_TEMPLATE = os.environ["TEST_RUN_TEMPLATE"]
     TESTNG_RESULTS_PATH = os.path.join(WORKSPACE, "test-output/polarion_testng-results.xml")
+
+OLD_EXPORTER = 0
 
 
 def fltr(obj, f):
@@ -51,25 +53,31 @@ class Suite(object):
     """
     A collection of TestCase objects.
     """
-    def __init__(self, results_root=None, project=None):
-        if results_root is None:
-            results_root = os.path.join(DEFAULT_WORKSPACE, DEFAULT_JENKINS_PROJECT, DEFAULT_RESULT_PATH)
-        self.tests = parser(results_root)
-        self._project = project
+    def __init__(self, transformer, project=None):
+        self.tests = []
+        self.transformer = transformer
 
-        not_skipped = filter(lambda x: x.status != SKIP, self.tests)
-        # TODO: It would be nice to have show which Tests got skipped due to dependency on another
-        # test that failed, or because of a BZ blocker
-        for test_case in not_skipped:
-            desc = test_case.description
-            title = test_case.title
+        #if OLD_EXPORTER:
+        #    self.tests = parser(results_root)
+        testng_suites = self.transformer.parse_suite()
+        self.tests = testng_suites
+        for k, v in testng_suites.items():
+            tests = v
+            self._project = transformer.project_id
 
-            t = lambda x: unicode.encode(x, encoding="utf-8", errors="ignore") if isinstance(x, unicode) else x
-            desc, title = [t(x) for x in [desc, title]]
+            not_skipped = filter(lambda x: x.status != SKIP, tests)
+            # TODO: It would be nice to have show which Tests got skipped due to dependency on another
+            # test that failed, or because of a BZ blocker
+            for test_case in not_skipped:
+                desc = test_case.description
+                title = test_case.title
 
-            log.info("Creating TestCase for {}: {}".format(title, desc))
-            pyl_tc = test_case.create_polarion_tc()
-            self._update_tc(pyl_tc)
+                t = lambda x: unicode.encode(x, encoding="utf-8", errors="ignore") if isinstance(x, unicode) else x
+                desc, title = [t(x) for x in [desc, title]]
+
+                log.info("Creating TestCase for {}: {}".format(title, desc))
+                pyl_tc = test_case.create_polarion_tc()
+                self._update_tc(pyl_tc)
 
     @property
     def project(self):
@@ -106,8 +114,10 @@ class Suite(object):
         test_run = TestRun.create(self.project, new_id, template_id)
         test_run.status = "inprogress"
 
-        for tc in self.tests:
-            tc.create_test_record(test_run, run_by=runner)
+        for s, testngs in self.tests.items():
+            log.info("Creating test run for {}".format(s))
+            for tc in testngs:
+                tc.create_test_record(test_run, run_by=runner)
 
         test_run.status = "finished"
         self._update_tr(test_run)
@@ -120,11 +130,12 @@ class Suite(object):
         :param runner: the user who ran the tests
         :return: None
         """
-        for tc in self.tests:
+        for _, testngs in self.tests:
             # Check to see if the test case is already part of the test run
-            if check_test_case_in_test_run(test_run, tc.polarion_tc.work_item_id):
-                continue
-            tc.create_test_record(test_run, run_by=runner)
+            for tc in testngs:
+                if check_test_case_in_test_run(test_run, tc.polarion_tc.work_item_id):
+                    continue
+                tc.create_test_record(test_run, run_by=runner)
 
     @staticmethod
     def get_test_run(test_run_id):
@@ -162,8 +173,15 @@ if __name__ == "__main__":
     parse_arg = cli.gen_argparse()
     args = parse_arg.parse_args()
 
+    # Save off our original .pylarion in case the user passes in a project-id that is different
+    # If the user selects --set-project-id, this change is permanent, but if --project-id (or -p)
+    # is used, this is just a temporary change
+    reset_project_id = False
+    get_pylarion_path = lambda: args.pylarion_path or os.path.expanduser("~/.pylarion")
+    using_pylarion_path = get_pylarion_path()
+    original_project_id = get_default_project(pylarion_path=using_pylarion_path)
+
     results_path = args.result_path
-    project_id = args.project_id or get_default_project()
     template_id = args.template_id  # eg "sean toner test template"
     testrun_id = args.testrun_id    # eg "pylarion exporter testing"
     gen_only = args.generate_only
@@ -171,7 +189,7 @@ if __name__ == "__main__":
 
     # CLI options that will quit if not None
     query_testcase = args.query_testcase
-    get_default_projectid = args.get_default_projectid
+    get_default_project_id = args.get_default_project_id
     get_latest_testrun = args.get_latest_testrun
 
     # FIXME:  Turn these into functions and decorate them
@@ -181,8 +199,11 @@ if __name__ == "__main__":
             #test = PylTestCase(uri=t.uri)
             msg = test.work_item_id + " " + test.title
             log.info(msg)
-    if get_default_projectid:
+    if get_default_project_id:
         log.info(get_default_project())
+    if args.set_project_id:
+        reset_project_id = True
+        cli.set_project_id()
     if get_latest_testrun:
         tr = get_latest_test_run(testrun_id)
 
@@ -191,11 +212,23 @@ if __name__ == "__main__":
 
         for attr in fields:
             print_tr(tr, attr)
-    if any([query_testcase, get_default_projectid, get_latest_testrun]):
+    if any([query_testcase, get_default_project_id, get_latest_testrun]):
         sys.exit(0)
 
-    # Will auto-generate polarion TestCases
-    suite = Suite(results_path)
+    # Get the project_id.  If the passed in value is different, we need to edit the .pylarion file
+    project_id = args.project_id
+    default_project_id = get_default_project()
+    if project_id != default_project_id:
+        cli.set_project_id(using_pylarion_path, project_id)
+
+    trans = 0
+
+    transformer = Transformer(project_id, results_path, template_id)
+    if OLD_EXPORTER:
+        # Will auto-generate polarion TestCases
+        suite = Suite(results_path)
+    else:
+        suite = Suite(transformer)
 
     # Once the suite object has been initialized, generate a test run with associated test records
     if not gen_only:
@@ -207,3 +240,11 @@ if __name__ == "__main__":
             log.info("Creating new TestRun...")
             suite.create_test_run(template_id, testrun_id)
     log.info("TestRun information completed to Polarion")
+
+    if reset_project_id:
+        try:
+            import shutil
+            backup = using_pylarion_path + ".bak"
+            shutil.move(backup, using_pylarion_path)
+        except Exception as ex:
+            cli.set_project_id(using_pylarion_path, original_project_id)

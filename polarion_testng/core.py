@@ -31,7 +31,20 @@ class TestNGToPolarion(object):
     ALLOWED_FIELDS = ["name", "status", "signature", "is-config", "duration-ms", "started-at",
                       "finished-at", "description", "data-provider", "depends-on-methods"]
 
-    def __init__(self, attrs, title, test_case=None, result=None, params=None, project=None, requirement=None):
+    def __init__(self, attrs, title, test_case=None, result=None, params=None, project=None, requirement=None,
+                 testng_test=None):
+        """
+
+        :param attrs: A dict of the <test-method> attributes
+        :param title: The class.method name of the <test-method> (becomes the TestRecord title)
+        :param test_case: A pylarion TestCase object
+        :param result:
+        :param params: A list of the arguments used from a data provider test
+        :param project: a string of the project id
+        :param requirement: a pylarion Requirement object
+        :param testng_test: the <test name=""> that represents what logical test this object belongs to
+        :return:
+        """
         self.title = title
         self.attributes = attrs
         self.description = "" if "description" not in attrs else attrs["description"]
@@ -44,6 +57,7 @@ class TestNGToPolarion(object):
         self.project = get_default_project() if project is None else project
         self._author = None
         self.requirement = requirement
+        self.testng_test = testng_test
 
     @property
     def status(self):

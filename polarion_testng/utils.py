@@ -49,6 +49,18 @@ def query_test_case(query, fields=None, **kwargs):
     return PylTestCase.query(query, fields=fields, **kwargs)
 
 
+def cached_tc_query(query, test_cases, fields=None):
+    title_match = lambda tc: str(tc.title) == query
+    matches = list(filter(title_match, test_cases))
+    if len(matches) > 1:
+        raise Exception("Can not have more than one match, modify your query")
+    elif len(matches) == 0:
+        return False
+    else:
+        return itz.first(matches)
+
+
+
 def query_requirement(query, fields=None, **kwargs):
     """
     Returns a list of pylarion Requirement objects
@@ -84,7 +96,7 @@ def title_query(q, wild=True):
     return query
 
 
-def get_default_project():
+def get_default_project(pylarion_path=PYLARION_CONFIG):
     """
     Reads in the ~/.pylarion config file to get default project
     :return: the default project

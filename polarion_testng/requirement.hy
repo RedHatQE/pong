@@ -16,6 +16,16 @@
     (first (filter fltr reqs))))
 
 
+(defn in-requirements?
+  [title requirements]
+  (let [title-match (fn [r] (= title (str r.title)))
+        titles (list (filter title-match requirements))]
+    (cond
+     [(> (len titles) 2) (raise (Exception "Should not have multiple matches on requirements"))]
+     [(= 0 (len titles)) False]
+     [true (first titles)])))
+
+
 (defn create-requirement
   [project-id title &optional [description ""]
                               [reqtype "functional"]
@@ -23,7 +33,7 @@
   ;; check to see if this Requirement exists already
   (let [existing (requirement-exists? title)]
     (if existing
-      exiting
+      existing
       (.create Requirement project-id title description :severity severity :reqtype reqtype))))
 (setv create-requirement.__doc__
       "Creates a new Requirement in Polarion.  Must supply a project id the REquirement belongs to
