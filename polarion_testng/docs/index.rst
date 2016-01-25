@@ -13,6 +13,14 @@ Contents:
 
    introduction
 
+.. toctree::
+   :maxdepth: 2
+
+   core
+   exporter
+   parsing
+   utils
+
 
 Indices and tables
 ==================

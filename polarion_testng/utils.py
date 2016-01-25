@@ -8,6 +8,8 @@ from pylarion.work_item import TestCase as PylTestCase
 from pylarion.work_item import Requirement
 from pylarion.test_run import TestRun
 
+from polarion_testng.decorators import retry, profile
+
 PYLARION_CONFIG = [os.path.join(os.environ['HOME'], ".pylarion")]
 PASS = "PASS"
 FAIL = "FAIL"
@@ -35,6 +37,8 @@ def get_class_methodname(s):
     return klass, methodname
 
 
+@profile
+@retry
 def query_test_case(query, fields=None, **kwargs):
     """
     Returns a list of pylarion TestCase objects
@@ -49,18 +53,28 @@ def query_test_case(query, fields=None, **kwargs):
     return PylTestCase.query(query, fields=fields, **kwargs)
 
 
-def cached_tc_query(query, test_cases, fields=None):
-    title_match = lambda tc: str(tc.title) == query
+def cached_tc_query(query, test_cases, multiple=False):
+    def title_match(tc):
+        klass, method_name = get_class_methodname(str(tc.title))
+        return klass == query
+
     matches = list(filter(title_match, test_cases))
-    if len(matches) > 1:
+    retval = []
+    if not multiple and len(matches) > 1:
         raise Exception("Can not have more than one match, modify your query")
     elif len(matches) == 0:
-        return False
+        if not multiple:
+            retval = False
     else:
-        return itz.first(matches)
+        if multiple:
+            retval = matches
+        else:
+            retval = itz.first(matches)
+    return retval
 
 
-
+@profile
+@retry
 def query_requirement(query, fields=None, **kwargs):
     """
     Returns a list of pylarion Requirement objects
@@ -75,7 +89,7 @@ def query_requirement(query, fields=None, **kwargs):
     return Requirement.query(query, fields=fields, **kwargs)
 
 
-def title_query(q, wild=True):
+def title_query(q, wild=True, no_quote=False):
     """
     Helps generate a title query.
 
@@ -86,9 +100,12 @@ def title_query(q, wild=True):
         print query  # title:"RHSM : RCT Tool"*
     :param q:
     :param wild:
+    :param no_quote: if true, don't surround
     :return:
     """
     title_fmt = 'title:"{}{}"'
+    if no_quote:
+        title_fmt = 'title:{}{}'
     extra = ""
     if wild:
         extra = "*"
@@ -193,8 +210,7 @@ def check_test_case_in_test_run(test_run, test_case_id):
     :param test_case_id:
     :return:
     """
-    check_tr = TestRun(uri=test_run.uri)
-    return any(test_case_id == rec.test_case_id for rec in check_tr._records)
+    return any(test_case_id == rec.test_case_id for rec in test_run._records)
 
 
 def zero_steps(polarion_tc):

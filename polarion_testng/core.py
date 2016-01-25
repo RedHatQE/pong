@@ -1,6 +1,7 @@
 from polarion_testng.utils import *
 from pylarion.work_item import TestSteps as PylTestSteps
 from pylarion.work_item import TestStep as PylTestStep
+from pylarion.work_item import Requirement as PylRequirement
 
 from polarion_testng.logger import log
 import datetime
@@ -56,7 +57,7 @@ class TestNGToPolarion(object):
         self._status = None
         self.project = get_default_project() if project is None else project
         self._author = None
-        self.requirement = requirement
+        self.requirement = requirement # PylRequirement(project_id=self.project, work_item_id=requirement)
         self.testng_test = testng_test
 
     @property
@@ -192,6 +193,18 @@ class TestNGToPolarion(object):
             if len(steps) == 0:
                 step = self.make_polarion_test_step()
                 tc.set_test_steps([step])
+
+            # link the requirement
+            # TODO: Do I need to check if the Requirement is already linked?
+            # FIXME: This is still broken.  I can find the requirement via a query, but when I try to link it
+            # pylarion gives me this:
+            # pylarion.exceptions.PylarionLibException: The WorkItem <pylarion.work_item.Requirement object at 0x7f2486093090> was not found.
+            # However this seems to be the way it is done in the example code
+            if 1:
+                if not self.requirement:
+                    log.warning("No requirement exists for this test case")
+                else:
+                    tc.add_linked_item(self.requirement, "verifies")
         else:
             tc = PylTestCase.create(self.project, self.title, self.description, **TC_KEYS)
 
@@ -201,6 +214,9 @@ class TestNGToPolarion(object):
                 tc.set_test_steps([step])
             else:
                 raise Exception("No step result in TestNGToPolarion")
+
+        if not tc:
+            raise Exception("Could not create TestCase for {}".format(self.title))
         return tc
 
     def make_polarion_test_step(self):

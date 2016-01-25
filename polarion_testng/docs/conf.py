@@ -19,6 +19,10 @@ import os
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath('../..'))
+print("================\nsys.path is", sys.path)
+
+import polarion_testng
 
 # -- General configuration ------------------------------------------------
 
@@ -32,6 +36,7 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.coverage',
     'sphinx.ext.viewcode',
+    'sphinx.ext.autodoc'
 ]
 
 # Add any paths that contain templates here, relative to this directory.

@@ -3,3 +3,5 @@
 *.pyc
 *.xml
 *.xsd
+build/
+docs/_build

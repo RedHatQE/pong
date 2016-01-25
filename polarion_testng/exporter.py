@@ -30,6 +30,7 @@ if 0:
     TESTNG_RESULTS_PATH = os.path.join(WORKSPACE, "test-output/polarion_testng-results.xml")
 
 OLD_EXPORTER = 0
+TESTING = 0
 
 
 def fltr(obj, f):
@@ -56,18 +57,25 @@ class Suite(object):
     def __init__(self, transformer, project=None):
         self.tests = []
         self.transformer = transformer
+        self._project = transformer.project_id
 
         #if OLD_EXPORTER:
         #    self.tests = parser(results_root)
+
+    def collect(self):
         testng_suites = self.transformer.parse_suite()
         self.tests = testng_suites
-        for k, v in testng_suites.items():
-            tests = v
-            self._project = transformer.project_id
 
+        for k, tests in testng_suites.items():
             not_skipped = filter(lambda x: x.status != SKIP, tests)
             # TODO: It would be nice to have show which Tests got skipped due to dependency on another
             # test that failed, or because of a BZ blocker
+            if TESTING:
+                import random
+                random.shuffle(not_skipped)
+                not_skipped = itz.take(5, not_skipped)
+
+            updated = []
             for test_case in not_skipped:
                 desc = test_case.description
                 title = test_case.title
@@ -77,7 +85,9 @@ class Suite(object):
 
                 log.info("Creating TestCase for {}: {}".format(title, desc))
                 pyl_tc = test_case.create_polarion_tc()
+                updated.append(pyl_tc)
                 self._update_tc(pyl_tc)
+            self.tests[k] = updated
 
     @property
     def project(self):
@@ -130,9 +140,12 @@ class Suite(object):
         :param runner: the user who ran the tests
         :return: None
         """
-        for _, testngs in self.tests:
+        for _, testngs in self.tests.items():
             # Check to see if the test case is already part of the test run
             for tc in testngs:
+                if tc.polarion_tc is None:
+                    log.info("How did this happen?  {} has no TestCase".format(tc.title))
+                    continue
                 if check_test_case_in_test_run(test_run, tc.polarion_tc.work_item_id):
                     continue
                 tc.create_test_record(test_run, run_by=runner)
@@ -145,11 +158,12 @@ class Suite(object):
         :param test_run_id:
         :return:
         """
-        all_fields = filter(lambda x: not x.startswith("_"),
-                            TestRun._cls_suds_map.keys())
-        all_fields = list(all_fields) + [test_run_id]
-        tr = TestRun.search('"{}"'.format(test_run_id), fields=all_fields,
+        #all_fields = filter(lambda x: not x.startswith("_"),  TestRun._cls_suds_map.keys())
+        #all_fields = list(all_fields) + [u"test_run_id"]
+        tr = TestRun.search('"{}"'.format(test_run_id), fields=[u"test_run_id"],
                             sort="created")
+        tr = itz.first(tr)
+        tr = TestRun(uri=tr.uri)
         return tr
 
     def create_test_run_template(self, template_id, case_type="automatedProcess", query=None):
@@ -223,7 +237,8 @@ if __name__ == "__main__":
 
     trans = 0
 
-    transformer = Transformer(project_id, results_path, template_id)
+    default_queries = [] if args.base_queries is None else args.base_queries
+    transformer = Transformer(project_id, results_path, template_id, base_queries=default_queries)
     if OLD_EXPORTER:
         # Will auto-generate polarion TestCases
         suite = Suite(results_path)
@@ -233,8 +248,8 @@ if __name__ == "__main__":
     # Once the suite object has been initialized, generate a test run with associated test records
     if not gen_only:
         if update_id:
+            log.info("Updating test run {}".format(update_id))
             tr = Suite.get_test_run(update_id)
-            log.info("Updating existing test run...")
             suite.update_test_run(tr)
         else:
             log.info("Creating new TestRun...")

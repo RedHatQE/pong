@@ -175,9 +175,7 @@ def parse_results(result_path, get_output=False):
 
 def parser(result_path, get_output=False):
     """
-    This is the main function which parses the polarion_testng-results.xml file and creates a dictionary of
-    test case title -> list of {attributes: (result of testmethod),
-                                args: (the arguments for this step)}
+    Creates a TestNGToPolarion object for each <test-method> in the xml file
 
     :param result_path:
     :return:
@@ -266,7 +264,9 @@ class Transformer(object):
 
     An object of this class is used to do the following:
     1) For each <suite>, get the <test> elements, and generate a Requirement if needed based on name
+
        - For each <class> in <test>, and for each <test-method> in <class>...
+
          - Generate a TestCase if needed, and link to the Requirement of the <test>
     """
     def __init__(self, project_id, results_path, template_id, requirement_prefix=TEST_REQUIREMENT_PREFIX,
@@ -291,12 +291,13 @@ class Transformer(object):
         self.requirement_prefix = requirement_prefix
         self._existing_requirements = existing_reqs
         self.quick_query = quick_query
-        if base_queries is None:
-            self.base_queries = []
+        self.base_queries = [] if base_queries is None else base_queries
 
         existing_test_cases = []
         for base in self.base_queries:
-            tcs = query_test_case(base)
+            bq = 'title:{}'.format(base)
+            log.info("Performing Polarion query of {}".format(bq))
+            tcs = query_test_case(bq)
             existing_test_cases.extend(tcs)
         self.existing_test_cases = existing_test_cases
 
@@ -398,15 +399,19 @@ class Transformer(object):
         if tests is None:
             tests = []
 
+        req_work_id = requirement.work_item_id
         for klass in test.iter("class"):
             class_name = klass.attrib["name"]
             query = "title:{}*".format(class_name)
             log.info("Querying Polarion for: {}".format(query))
+
+            # To save time, let's see if we've got a cache of the existing test cases.  If there is
+            # we can just look up a test case in our single monster cache rather than perform a query
+            # everytime
             if not self.existing_test_cases:
                 matches = query_test_case(query)
             else:
-                query = "title:{}".format(class_name)
-                matches = [cached_tc_query(query, self.existing_test_cases)]
+                matches = cached_tc_query(class_name, self.existing_test_cases, multiple=True)
             ptc = None
             testng = None
             testng_test_name = test.attrib["name"]
@@ -451,10 +456,13 @@ class Transformer(object):
                 result = TestIterationResult(attrs, params=args, exception=get_exception(test_method))
                 if test_case_title not in titles:
                     testng = TestNGToPolarion(attrs, title=test_case_title, test_case=ptc, result=result,
-                                              params=args, requirement=requirement, testng_test = testng_test_name)
+                                              params=args, requirement=req_work_id, testng_test=testng_test_name)
                     titles.add(test_case_title)
                     tests.append(testng)
                 else:
                     testng.step_results.append(result)
+
+        for t in tests:
+            print t
 
         return titles, tests
