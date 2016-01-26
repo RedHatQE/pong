@@ -1,26 +1,58 @@
 """
 Source controlled version for the post build step
 
-1.  Clone the testng repo to jenkins slave
-2.  Get the Arch and Variant that we tested on (CLIENT_1)
-3.  Create a Suite
-4.  call suite.create_test_run("/path/to/testng-results.xml")
+1. Grab the ${TEST_ENVIRONMENT} variable
+2. Parse what we need
 """
 
 import os
-from subprocess import Popen, PIPE, STDOUT
+import ConfigParser
+from functools import partial
+from pyrsistent import PRecord, field
 
-WORKSPACE = os.environ["WORKSPACE"]
-client_1 = os.environ["CLIENT_1"]
-smoke_dir = os.path.join(WORKSPACE, "smoke")
 
-if os.path.exists(smoke_dir):
-    os.unlink(smoke_dir)
+class TestEnvironment(PRecord):
+    """
+    Immutable class type that defines what we need from the test environment file
+    """
+    distro_arch = field(mandatory=True)
+    distro_variant = field(mandatory=True)
+    upstream_workspace = field()
+    upstream_slave = field()
+    rhelx = field()
+    rhely = field()
+    upstream_build_id = field(mandatory=True)
+    upstream_build_number = field(mandatory=True)
+    results_path = field(mandatory=True)
+    project_id = field(mandatory=True)
 
-proc = Popen("git clone ", stdout=STDOUT, stderr=STDOUT)
-outp, _ = proc.communicate()
-if proc.returncode != 0:
-    raise Exception("Unable to clone smoke exporter")
 
-print(outp)
+def get_test_environment(test_env):
+    """
+    Grabs the needed environment variables from the ${TEST_ENVIRONMENT} file
+    :param test_env:
+    :return:
+    """
+    # Values to pull from the test_env file
+    keys = ["DISTRO_ARCH", "DISTRO_VARIANT", "UPSTREAM_WORKSPACE", "UPSTREAM_SLAVE", "RHELX", "RHELY",
+            "UPSTREAM_BUILD_ID", "UPSTREAM_BUILD_NUMBER"]
+    cfg = ConfigParser.ConfigParser()
+    parsed = cfg.read([os.path.expanduser(test_env)])
+    if not parsed:
+        raise Exception("Could not find test environment file {}".format(test_env))
 
+    get = partial(cfg.get, "test_environment")
+    n = {v.lower(): get(v) for v in keys}
+
+    # project_id and results_path will be determined based on the above info
+    if "7" in n["rhelx"]:
+        n["project_id"] = "RedHatEnterpriseLinux7"
+    elif "6" in n["rhelx"]:
+        n["project_id"] = "RHEL6"
+    else:
+        raise Exception("Unknown project type")
+
+    # Get the testng-results.xml path
+    r_path = "https://rhsm-jenkins.rhev-ci-vms.eng.rdu2.redhat.com/job/{}/{}/artifact/test-output/testng-results.xml"
+    n["results_path"] = r_path.format(n["upstream_build_id"], n["upstream_build_number"])
+    return TestEnvironment(**n)
