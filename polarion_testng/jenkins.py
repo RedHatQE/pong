@@ -21,7 +21,7 @@ class TestEnvironment(PRecord):
     upstream_slave = field()
     rhelx = field()
     rhely = field()
-    upstream_build_id = field(mandatory=True)
+    upstream_job_name = field(mandatory=True)
     upstream_build_number = field(mandatory=True)
     results_path = field(mandatory=True)
     project_id = field(mandatory=True)

@@ -221,6 +221,7 @@ if __name__ == "__main__":
     using_pylarion_path = get_pylarion_path()
     original_project_id = get_default_project(pylarion_path=using_pylarion_path)
 
+    project_id = args.project_id
     results_path = args.result_path
     template_id = args.template_id  # eg "sean toner test template"
     testrun_id = args.testrun_id    # eg "pylarion exporter testing"
