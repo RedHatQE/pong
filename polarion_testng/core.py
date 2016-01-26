@@ -1,7 +1,6 @@
 from polarion_testng.utils import *
 from pylarion.work_item import TestSteps as PylTestSteps
 from pylarion.work_item import TestStep as PylTestStep
-from pylarion.work_item import Requirement as PylRequirement
 
 from polarion_testng.logger import log
 import datetime
@@ -173,8 +172,11 @@ class TestNGToPolarion(object):
         """
         Given the polarion_testng.TestCase, convert it to the equivalent pylarion.work_item.TestCase
         """
+        t = lambda x: unicode.encode(x, encoding="utf-8", errors="ignore") if isinstance(x, unicode) else x
+        desc, title = [t(x) for x in [self.description, self.title]]
         # Check to see if we already have an existing test case
         if self.polarion_tc:
+            log.info("Getting TestCase for {}: {}".format(title, desc))
             tc = self.polarion_tc
             self.validate_test(tc)
 
@@ -193,19 +195,8 @@ class TestNGToPolarion(object):
             if len(steps) == 0:
                 step = self.make_polarion_test_step()
                 tc.set_test_steps([step])
-
-            # link the requirement
-            # TODO: Do I need to check if the Requirement is already linked?
-            # FIXME: This is still broken.  I can find the requirement via a query, but when I try to link it
-            # pylarion gives me this:
-            # pylarion.exceptions.PylarionLibException: The WorkItem <pylarion.work_item.Requirement object at 0x7f2486093090> was not found.
-            # However this seems to be the way it is done in the example code
-            if 1:
-                if not self.requirement:
-                    log.warning("No requirement exists for this test case")
-                else:
-                    tc.add_linked_item(self.requirement, "verifies")
         else:
+            log.info("Generating new TestCase for {}: {}".format(title, desc))
             tc = PylTestCase.create(self.project, self.title, self.description, **TC_KEYS)
 
             # Create PylTestSteps if needed and add it
@@ -217,6 +208,16 @@ class TestNGToPolarion(object):
 
         if not tc:
             raise Exception("Could not create TestCase for {}".format(self.title))
+        else:
+            self.polarion_tc = tc
+
+        linked_items = tc.get_back_linked_work_items()
+        if not self.requirement:
+            log.warning("No requirement exists for this test case")
+        else:
+            if not any(filter(lambda x: x == self.requirement, [li.work_item_id for li in linked_items])):
+                log.info("Linking requirement {} to TestCase {}".format(self.requirement, tc.work_item_id))
+                tc.add_linked_item(self.requirement, "verifies")
         return tc
 
     def make_polarion_test_step(self):
