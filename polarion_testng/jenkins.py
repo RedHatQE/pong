@@ -35,7 +35,7 @@ def get_test_environment(test_env):
     """
     # Values to pull from the test_env file
     keys = ["DISTRO_ARCH", "DISTRO_VARIANT", "UPSTREAM_WORKSPACE", "UPSTREAM_SLAVE", "RHELX", "RHELY",
-            "UPSTREAM_BUILD_ID", "UPSTREAM_BUILD_NUMBER"]
+            "UPSTREAM_JOB_NAME", "UPSTREAM_BUILD_NUMBER"]
     cfg = ConfigParser.ConfigParser()
     parsed = cfg.read([os.path.expanduser(test_env)])
     if not parsed:
@@ -54,5 +54,5 @@ def get_test_environment(test_env):
 
     # Get the testng-results.xml path
     r_path = "https://rhsm-jenkins.rhev-ci-vms.eng.rdu2.redhat.com/job/{}/{}/artifact/test-output/testng-results.xml"
-    n["results_path"] = r_path.format(n["upstream_build_id"], n["upstream_build_number"])
+    n["results_path"] = r_path.format(n["upstream_job_name"], n["upstream_build_number"])
     return TestEnvironment(**n)
