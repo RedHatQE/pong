@@ -1,0 +1,20 @@
+# This is an example YAML file that can be used for running
+
+pylarion_path: None
+user: stoner      # the pylarion user id (will override 
+password: foobar  # the pylarion user's password
+result_path: /home/stoner/Downloads/testng-results.xml  # path to the xml file. Overridden by -r or -e
+project_id: RHEL6 # project id.  Overridden by -p or -e
+testrun_id: "pylarion exporter testing"
+testrun_prefix: "RHSM:"
+testrun_suffix: ""
+update_run: None
+req_prefix: ""
+distro: RHEL
+distro_major: 6
+distro_minor: 8
+distro_arch: x86_64
+distro_variant: Server
+base_queries:
+  - "rhsm.*.tests*"
+environment_file: None
