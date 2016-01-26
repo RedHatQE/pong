@@ -158,7 +158,11 @@ def get_latest_test_run(test_run_name):
     s = TestRun.search('"{}"'.format(test_run_name),
                        fields=["test_run_id", "created", "status"],
                        sort="created")
-    return itz.last(s) if s else None
+    current = None
+    if s:
+        latest = itz.last(s)
+        current = TestRun(uri=latest.uri)
+    return current
 
 
 def get_test_run(project_id, test_run_id):

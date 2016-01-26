@@ -211,7 +211,7 @@ class TestNGToPolarion(object):
         else:
             self.polarion_tc = tc
 
-        linked_items = tc.get_back_linked_work_items()
+        linked_items = tc.linked_work_items
         if not self.requirement:
             log.warning("No requirement exists for this test case")
         else:

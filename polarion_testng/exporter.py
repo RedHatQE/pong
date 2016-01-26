@@ -148,7 +148,7 @@ class Suite(object):
                 tc.create_test_record(test_run, run_by=runner)
 
             test_run.status = "finished"
-            self._update_tr(test_run)
+            #self._update_tr(test_run)
 
     def update_test_run(self, test_run, runner="stoner"):
         """
@@ -206,6 +206,7 @@ class Suite(object):
         pass
 
 # FIXME: this has gotten huge.  Let's turn this into a separate function or class
+# Also, we should have a config file, where the CLI will override the config file
 if __name__ == "__main__":
     import hy
     import polarion_testng.cli as cli
@@ -286,7 +287,7 @@ if __name__ == "__main__":
         sys.exit(0)
 
     # Get the project_id.  If the passed in value is different, we need to edit the .pylarion file
-    if not project_id or args.project_id:
+    if project_id is None and test_env is None:
         raise Exception("Must pass in either -p or -e to get project_id")
     default_project_id = get_default_project()
     if project_id != default_project_id:
