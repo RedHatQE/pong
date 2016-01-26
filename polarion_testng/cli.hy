@@ -9,7 +9,8 @@
  (except [e ImportError]
    (import [ConfigParser :as configparser])))
 
-
+;; FIXME: Ok, this is huge.  Let's also create a config file (YAML?) and the CLI can override
+;; anything in the config file
 (defn gen-argparse
   []
   (let [parser (ArgumentParser)]
@@ -22,8 +23,7 @@
     (.add_argument parser "--password" :help "Set the .pylarion user's password")
     (.add_argument parser "--get-latest-testrun" :help "Find the latest testrun id"
                                                  :action "store_true" :default False)
-    (.add_argument parser "-l" "--show-link" :help "Show the URL for the TestRun in Polarion")
-    (.add_argument parser "-r" "--result-path" :help "path to testng-result.xml" :required True)
+    (.add_argument parser "-r" "--result-path" :help "path to testng-result.xml")
     (.add_argument parser "-p" "--project-id" :help "project id (defaults to what is in .pylarion")
     (.add_argument parser "-i" "--testrun-id" :help "Base name of the testrun")
     (.add_argument parser "-t" "--template-id" :help "Name of TestRun Template to get tests from"
@@ -35,6 +35,8 @@
                                                      exist, use it to create new TestRun ID 
                                                      (this will override -t)")
     (.add_argument parser "--testrun-prefix" :help "A str prefix to be added before an auto generation
+                                                   Polarion TestRun id.  (defaults to 'RHSM')")
+    (.add_argument parser "--testrun-suffix" :help "A str suffix to be added before an auto generation
                                                    Polarion TestRun id.  (defaults to 'RHSM')")
     (.add_argument parser "--req-prefix" :help "A str prefix to be added to an auto generated Polarion
                                                Requirement title (defaults to empty string)")
@@ -49,6 +51,7 @@
     (.add_argument parser "-P" "--pylarion-path" :help "path to .pylarion file (defaults to ~/.pylarion")
     (.add_argument parser "-b" "--base-queries" :help "a sequence of strings to be used as queries"
                    :nargs "*")
+    (.add_argument parser "-e" "--environment-file" :help "Path to the ${TEST_ENVIRONMENT}")
     parser))
 
 
