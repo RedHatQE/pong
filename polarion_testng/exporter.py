@@ -22,6 +22,7 @@ from polarion_testng.logger import log
 from polarion_testng.utils import *
 from polarion_testng.decorators import retry, profile
 from polarion_testng.parsing import parser, Transformer
+from polarion_testng.jenkins import get_test_environment, TestEnvironment
 
 # Jenkins created environment variables
 if 0:
@@ -54,13 +55,11 @@ class Suite(object):
     """
     A collection of TestCase objects.
     """
-    def __init__(self, transformer, project=None):
-        self.tests = []
+    def __init__(self, transformer):
+        self.tests = None
         self.transformer = transformer
         self._project = transformer.project_id
-
-        #if OLD_EXPORTER:
-        #    self.tests = parser(results_root)
+        self.collect()
 
     def collect(self):
         testng_suites = self.transformer.parse_suite()
@@ -75,19 +74,23 @@ class Suite(object):
                 random.shuffle(not_skipped)
                 not_skipped = itz.take(5, not_skipped)
 
+            total = len(not_skipped) - 1
             updated = []
-            for test_case in not_skipped:
-                desc = test_case.description
-                title = test_case.title
-
-                t = lambda x: unicode.encode(x, encoding="utf-8", errors="ignore") if isinstance(x, unicode) else x
-                desc, title = [t(x) for x in [desc, title]]
-
-                log.info("Creating TestCase for {}: {}".format(title, desc))
+            for i, test_case in enumerate(not_skipped, start=0):
+                log.info("Getting TestCase: {} out of {}".format(i, total))
                 pyl_tc = test_case.create_polarion_tc()
-                updated.append(pyl_tc)
                 self._update_tc(pyl_tc)
+                test_case.polarion_tc = pyl_tc
+                updated.append(test_case)
+
             self.tests[k] = updated
+
+        for k, tests in self.tests.items():
+            for tc in tests:
+                if tc.polarion_tc is None:
+                    log.info("WTF.  {} has tc.polarion_tc is None".format(tc.title))
+
+        print self.tests
 
     @property
     def project(self):
@@ -118,19 +121,34 @@ class Suite(object):
         :param runner: str of the user id (eg stoner, not "Sean Toner")
         :return: None
         """
-        tr = get_latest_test_run(test_run_base)
-        new_id = make_test_run_id_from_latest(tr)
-        log.info("Creating new Test Run ID: {}".format(new_id))
-        test_run = TestRun.create(self.project, new_id, template_id)
-        test_run.status = "inprogress"
-
         for s, testngs in self.tests.items():
+            if test_run_base is None:
+                test_run_base = self.transformer.generate_base_testrun_id(s)
+
+            # Find our latest run.  If it doesn't exist, we'll generate one
+            tr = get_latest_test_run(test_run_base)
+            if tr:
+                new_id = make_test_run_id_from_latest(tr)
+            else:
+                new_id = test_run_base + " 1"
+            log.info("Creating new Test Run ID: {}".format(new_id))
+            retries = 3
+            while retries > 0:
+                try:
+                    test_run = TestRun.create(self.project, new_id, template_id)
+                    break
+                except:
+                    retries -= 1
+            else:
+                raise Exception("Could not create a new TestRun")
+            test_run.status = "inprogress"
             log.info("Creating test run for {}".format(s))
+
             for tc in testngs:
                 tc.create_test_record(test_run, run_by=runner)
 
-        test_run.status = "finished"
-        self._update_tr(test_run)
+            test_run.status = "finished"
+            self._update_tr(test_run)
 
     def update_test_run(self, test_run, runner="stoner"):
         """
@@ -144,26 +162,24 @@ class Suite(object):
             # Check to see if the test case is already part of the test run
             for tc in testngs:
                 if tc.polarion_tc is None:
-                    log.info("How did this happen?  {} has no TestCase".format(tc.title))
-                    continue
+                    raise Exception("How did this happen?  {} has no TestCase".format(tc.title))
                 if check_test_case_in_test_run(test_run, tc.polarion_tc.work_item_id):
                     continue
                 tc.create_test_record(test_run, run_by=runner)
 
     @staticmethod
-    def get_test_run(test_run_id):
+    def get_test_run(test_run_id, create=True):
         """
         Looks for matching TestRun given a test_run_id string
 
         :param test_run_id:
         :return:
         """
-        #all_fields = filter(lambda x: not x.startswith("_"),  TestRun._cls_suds_map.keys())
-        #all_fields = list(all_fields) + [u"test_run_id"]
         tr = TestRun.search('"{}"'.format(test_run_id), fields=[u"test_run_id"],
                             sort="created")
         tr = itz.first(tr)
-        tr = TestRun(uri=tr.uri)
+        if tr:
+            tr = TestRun(uri=tr.uri)
         return tr
 
     def create_test_run_template(self, template_id, case_type="automatedProcess", query=None):
@@ -179,7 +195,17 @@ class Suite(object):
                                                 select_test_cases_by=case_type)
         return test_template
 
+    def generate_testrun_id(self):
+        """
+        The test run id will be a concatenation of several strings
 
+        prefix + suite_name + suffix + unique_id
+
+        :return:
+        """
+        pass
+
+# FIXME: this has gotten huge.  Let's turn this into a separate function or class
 if __name__ == "__main__":
     import hy
     import polarion_testng.cli as cli
@@ -200,6 +226,35 @@ if __name__ == "__main__":
     testrun_id = args.testrun_id    # eg "pylarion exporter testing"
     gen_only = args.generate_only
     update_id = args.update_run
+    test_env = args.environment_file
+    arch = args.arch
+    variant = args.variant
+
+    for a in dir(args):
+        obj = getattr(args, a)
+        if a.startswith("_"):
+            continue
+        if callable(obj):
+            continue
+        log.info("{} = {}".format(a, obj))
+
+    # Check to see if the -e option was passed in to look for the test environment file.  If so,
+    # we will use it to get the project id, and path to the result file
+    te = None
+    if results_path is None and test_env is None:
+        log.error("Must pass in either a -r or -e to get the testng-results.xml file")
+        sys.exit(0)
+    if test_env is not None:
+        log.info("Overriding other arguments passed in from CLI")
+        te = get_test_environment(test_env)
+        results_path = te.results_path
+        log.info("\tresults_path is now {}".format(results_path))
+        project_id = te.project_id
+        log.info("\tproject_id is now {}".format(project_id))
+        arch = te.distro_arch
+        log.info("\tarch is now {}".format(arch))
+        variant = te.distro_variant
+        log.info("\tvariant is now {}".format(variant))
 
     # CLI options that will quit if not None
     query_testcase = args.query_testcase
@@ -230,7 +285,8 @@ if __name__ == "__main__":
         sys.exit(0)
 
     # Get the project_id.  If the passed in value is different, we need to edit the .pylarion file
-    project_id = args.project_id
+    if not project_id or args.project_id:
+        raise Exception("Must pass in either -p or -e to get project_id")
     default_project_id = get_default_project()
     if project_id != default_project_id:
         cli.set_project_id(using_pylarion_path, project_id)
@@ -238,7 +294,7 @@ if __name__ == "__main__":
     trans = 0
 
     default_queries = [] if args.base_queries is None else args.base_queries
-    transformer = Transformer(project_id, results_path, template_id, base_queries=default_queries)
+    transformer = Transformer(project_id, results_path, template_id, base_queries=default_queries, test_env=te)
     if OLD_EXPORTER:
         # Will auto-generate polarion TestCases
         suite = Suite(results_path)
