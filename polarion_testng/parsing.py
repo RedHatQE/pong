@@ -1,4 +1,6 @@
 import xml.etree.ElementTree as ET
+from urllib2 import urlopen
+from urlparse import urlparse
 
 from polarion_testng.core import TestIterationResult, TestNGToPolarion
 from polarion_testng.decorators import fixme
@@ -244,6 +246,35 @@ def parser(result_path, get_output=False):
     return tests
 
 
+def download_url(urlpath, output_dir=".", binary=False):
+    try:
+        thing = urlopen(urlpath)
+    except Exception as e:
+        print(str(e))
+        return
+
+    parsed = urlparse(urlpath)
+    filename = os.path.basename(parsed.path)
+    writemod = "wb" if binary else "w"
+
+    fobj = thing.read()
+    if output_dir != ".":
+        if not os.path.exists(output_dir):
+            log.error("{0} does not exist".format(output_dir))
+            log.error("Writing file to {0}".format(os.getcwd()))
+        else:
+            filename = "/".join([output_dir, filename])
+    with open(filename, writemod) as downloaded:
+        try:
+            downloaded.write(fobj)
+        except TypeError:
+            with open(filename, "wb") as downloaded:
+                downloaded.write(fobj)
+    if not os.path.exists(filename):
+        raise Exception("Could not write to {}".format(filename))
+    return filename
+
+
 class Transformer(object):
     """
     Parses the testng-results.xml file along with some metadata to generate Polarion data
@@ -270,7 +301,8 @@ class Transformer(object):
          - Generate a TestCase if needed, and link to the Requirement of the <test>
     """
     def __init__(self, project_id, results_path, template_id, requirement_prefix=TEST_REQUIREMENT_PREFIX,
-                 testrun_prefix="", distro=None, existing_reqs=None, quick_query=True, base_queries=None):
+                 testrun_prefix="", test_env=None, existing_reqs=None, quick_query=True, base_queries=None,
+                 testrun_suffix="testing"):
         """
 
         :param project_id:
@@ -284,7 +316,7 @@ class Transformer(object):
         :return:
         """
         self.testrun_prefix = testrun_prefix
-        self.distro = distro
+        self.testrun_suffix = testrun_suffix
         self.template_id = template_id
         self.results_path = results_path
         self.project_id = project_id
@@ -292,6 +324,12 @@ class Transformer(object):
         self._existing_requirements = existing_reqs
         self.quick_query = quick_query
         self.base_queries = [] if base_queries is None else base_queries
+        self.test_env = test_env
+
+        # If our test_env is not None, that means we're using a test_environment file to get some arguments
+        if test_env is not None:
+            self.project_id = test_env.project_id
+            self.results_path = test_env.results_path
 
         existing_test_cases = []
         for base in self.base_queries:
@@ -300,6 +338,14 @@ class Transformer(object):
             tcs = query_test_case(bq)
             existing_test_cases.extend(tcs)
         self.existing_test_cases = existing_test_cases
+
+    def generate_base_testrun_id(self, suite_name):
+        """
+        Generates a base testrun_id
+
+        :return:
+        """
+        return "{} {} {}".format(self.testrun_prefix, suite_name, self.testrun_suffix)
 
     @property
     def existing_requirements(self):
@@ -314,6 +360,9 @@ class Transformer(object):
     @staticmethod
     @profile
     def parse_by_element(result_path, element):
+        if result_path.startswith("http"):
+            result_path = download_url(result_path)
+
         tree = ET.parse(result_path)
         root = tree.getroot()
         return root.iter(element)
@@ -461,8 +510,5 @@ class Transformer(object):
                     tests.append(testng)
                 else:
                     testng.step_results.append(result)
-
-        for t in tests:
-            print t
 
         return titles, tests
