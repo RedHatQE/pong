@@ -1,4 +1,5 @@
 toolz
+pyrsistent
 python-logstash
 suds
 requests
