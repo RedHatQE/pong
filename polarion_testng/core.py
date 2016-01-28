@@ -67,8 +67,10 @@ class TestNGToPolarion(object):
         :return:
         """
         if self._status is None:
-            self._status = self.attributes["status"]
-
+            result = PASS
+            if any(filter(lambda ti: ti.status != "PASS" or ti.status != "SKIP", self.step_results)):
+                result = FAIL
+            self._status = result
         return self._status
 
     @property
