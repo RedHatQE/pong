@@ -10,6 +10,7 @@ from polarion_testng.utils import *
 import hy
 import polarion_testng.requirement as preq
 from polarion_testng.decorators import profile
+from pyrsistent import PRecord, field
 
 
 def get_data_provider_elements(elem):
@@ -450,65 +451,124 @@ class Transformer(object):
 
         req_work_id = requirement.work_item_id
         for klass in test.iter("class"):
-            class_name = klass.attrib["name"]
-            query = "title:{}*".format(class_name)
-            log.info("Querying Polarion for: {}".format(query))
-
-            # To save time, let's see if we've got a cache of the existing test cases.  If there is
-            # we can just look up a test case in our single monster cache rather than perform a query
-            # everytime
-            if not self.existing_test_cases:
-                matches = query_test_case(query)
-            else:
-                matches = cached_tc_query(class_name, self.existing_test_cases, multiple=True)
-            ptc = None
+            t_class = TNGTestClass(test, klass.attrib)
             testng = None
             testng_test_name = test.attrib["name"]
-
             last_test_method = None
             iteration = 1
+            cached_lookup = self.existing_test_cases
+
             for test_method in klass:
-                attribs = test_method.attrib
-                attrs = attribs
-
-                # if this is an is-config method, skip it
-                if "is-config" in attribs and attribs["is-config"] == "true":
+                if "is-config" in test_method.attrib and test_method.attrib["is-config"] == "true":
                     continue
+                tm = TNGTestMethod(test_method, t_class, cached_query=cached_lookup)
 
-                method_name = attribs["name"]
                 if last_test_method is None:
-                    last_test_method = method_name
-                elif method_name != last_test_method:
-                    ptc = None
-                    last_test_method = method_name
+                    last_test_method = tm.method_name
+                elif tm.method_name != last_test_method:
+                    last_test_method = tm.method_name
 
-                if ptc is None:
-                    for match in matches:
-                        _, methodname = get_class_methodname(match.title)
-                        if str(methodname) == str(method_name):
-                            log.info("Found existing TestCase in Polarion: {}".format(match.title))
-                            ptc = PylTestCase(uri=match.uri)
-                            break
-
-                test_case_title = class_name + "." + method_name
+                test_case_title = tm.full_name
                 if test_case_title not in titles:
                     iteration = 1
                 template = "\tIteration {}: parsing {} {}"
-                log.info(template.format(iteration, test_case_title, attribs['started-at']))
+                log.info(template.format(iteration, test_case_title, tm.attribs['started-at']))
                 iteration += 1
 
-                # If we have data-provider elements, we need to grab all the params
-                args = None
-                if 'data-provider' in attribs:
-                    args = get_data_provider_elements(test_method)
-
-                result = TestIterationResult(attrs, params=args, exception=get_exception(test_method))
                 if test_case_title not in titles:
-                    testng = TestNGToPolarion(attrs, title=test_case_title, test_case=ptc, result=result,
-                                              params=args, requirement=req_work_id, testng_test=testng_test_name)
+                    testng = tm.make_testngtopolarion(req_work_id, testng_test_name)
                     titles.add(test_case_title)
                     tests.append(testng)
                 else:
-                    testng.step_results.append(result)
+                    # We only get multiple test_case_title if it was a data-provider test so append results
+                    testng.step_results.append(tm.result)
 
         return titles, tests
+
+
+class TNGTestClass(object):
+    def __init__(self, test_elem, attribs):
+        self.name = attribs["name"]
+        self.query_title = "title:{}*".format(self.name)
+
+    def find_me(self, existing_tests=None, multiple=True):
+        log.info("Querying Polarion for: {}".format(self.query_title))
+        if existing_tests is None:
+            matches = query_test_case(self.query_title)
+        else:
+            matches = cached_tc_query(self.name, existing_tests, multiple=multiple)
+        return matches
+
+
+class TNGTestMethod(object):
+    """
+    Python class to represent a <test-method>
+    """
+    def __init__(self, tm_elem, test_class, cached_query=None):
+        """
+
+        :param tm_elem: The Element of the <test-method>
+        :param test_class: The Element of the <class>
+        :param cached_query: a list of the already queried pylarion TestCase
+        :return:
+        """
+        self._p_testcase = None
+        self.parent_class = test_class
+        self.class_name = test_class.name
+        self.method_name = tm_elem.attrib["name"]
+        self.full_name = "{}.{}".format(self.class_name, self.method_name)
+        self.cached = cached_query
+        self.attribs = tm_elem.attrib
+        self.result = self._make_testiterationresult(tm_elem)
+
+    @property
+    def p_testcase(self):
+        if self._p_testcase is None:
+            self._p_testcase = self.find_matching_polarion_tc()
+        return self._p_testcase
+
+    @p_testcase.setter
+    def p_testcase(self, val):
+        if not isinstance(val, PylTestCase):
+            raise Exception("p_testcase must be a pylarion.work_item.TestCase object")
+        self._p_testcase = val
+
+    def find_matching_polarion_tc(self):
+        """
+        Uses the cached lookup to find a matching class.methodname
+
+        :return: pylarion.work_item.TestCase
+        """
+        matches = self.parent_class.find_me(existing_tests=self.cached, multiple=True)
+
+        ptc = None
+        if self._p_testcase is None:
+            for match in matches:
+                _, methodname = get_class_methodname(match.title)
+                if str(methodname) == str(self.method_name):
+                    log.info("Found existing TestCase in Polarion: {}".format(match.title))
+                    ptc = PylTestCase(uri=match.uri)
+        else:
+            ptc = self._p_testcase
+        return ptc
+
+    def _make_testiterationresult(self, test_elem):
+        result = None
+        if 'data_provider' in self.attribs:
+            args = get_data_provider_elements(test_elem)
+            result = TestIterationResult(test_elem.attrib, params=args, exception=get_exception(test_elem))
+        return result
+
+    def make_testngtopolarion(self, requirement_id, testng_test_name):
+        """
+        Creates a TestNGToPolarion object based on this object
+
+        :param requirement_id: a str of the work_item_id of the associated Requirement
+        :param testng_test_name: the name of the test from the testng results.xml
+        :return:
+        """
+        testng = TestNGToPolarion(self.attribs, title=self.full_name, test_case=self.p_testcase,
+                                  result=self.result, params=self.result.params, requirement=requirement_id,
+                                  testng_test=testng_test_name)
+
+        return testng

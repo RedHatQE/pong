@@ -1,4 +1,4 @@
-from polarion_testng.exporter import Suite
+from polarion_testng.exporter import Exporter
 
-suite = Suite("../../polarion_testng-results.xml")
+suite = Exporter("../../polarion_testng-results.xml")
 suite.create_test_run("Sean Toner Template Automation Testing", "Jenkins Run")

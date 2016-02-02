@@ -27,9 +27,11 @@ class TestEnvironment(PRecord):
     project_id = field(mandatory=True)
 
 
-def get_test_environment(test_env):
+def get_test_environment(test_env, artifact_archive=None):
     """
     Grabs the needed environment variables from the ${TEST_ENVIRONMENT} file
+    :param artifact_archive:
+    :param jenkins_url:
     :param test_env:
     :return:
     """
@@ -42,17 +44,19 @@ def get_test_environment(test_env):
         raise Exception("Could not find test environment file {}".format(test_env))
 
     get = partial(cfg.get, "test_environment")
-    n = {v.lower(): get(v) for v in keys}
+    t_env = {v.lower(): get(v) for v in keys}
 
     # project_id and results_path will be determined based on the above info
-    if "7" in n["rhelx"]:
-        n["project_id"] = "RedHatEnterpriseLinux7"
-    elif "6" in n["rhelx"]:
-        n["project_id"] = "RHEL6"
+    if "7" in t_env["rhelx"]:
+        t_env["project_id"] = "RedHatEnterpriseLinux7"
+    elif "6" in t_env["rhelx"]:
+        t_env["project_id"] = "RHEL6"
     else:
         raise Exception("Unknown project type")
 
     # Get the testng-results.xml path
-    r_path = "https://rhsm-jenkins.rhev-ci-vms.eng.rdu2.redhat.com/job/{}/{}/artifact/test-output/testng-results.xml"
-    n["results_path"] = r_path.format(n["upstream_job_name"], n["upstream_build_number"])
-    return TestEnvironment(**n)
+    if artifact_archive is None:
+        "test-output/testng-results.xml"
+    r_path = "{}/artifact/{}"
+    t_env["results_path"] = r_path.format(t_env["build_url"], artifact_archive)
+    return TestEnvironment(**t_env)

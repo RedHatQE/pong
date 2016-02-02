@@ -1,4 +1,4 @@
-from polarion_testng.exporter import Suite
+from polarion_testng.exporter import Exporter
 from polarion_testng.exporter import get_test_run
 import ssl
 import argparse
@@ -33,5 +33,5 @@ while done > 0:
         # give 3 tries total
         done -= 1
 
-suite = Suite(args.testng_path)
+suite = Exporter(args.testng_path)
 suite.update_test_run(tr)

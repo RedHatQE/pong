@@ -1,9 +1,6 @@
 [test_environment]
 DISTRO_ARCH=x86_64
 DISTRO_VARIANT=Server
-UPSTREAM_WORKSPACE=/home/jenkins/workspace/stoner-gui-test-smoke
-UPSTREAM_SLAVE=rhsm-jenkins-slave2
 RHELX=6
 RHELY=8
-UPSTREAM_BUILD_ID=stoner-gui-test-smoke
-UPSTREAM_BUILD_NUMBER=70
+BUILD_URL=

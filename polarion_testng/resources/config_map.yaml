@@ -1,0 +1,23 @@
+---
+
+pylarion_path: "~/.pylarion"
+user: ""
+password: ""
+result_path: ""
+project_id: ""
+testrun_template: ""
+testrun_prefix: ""
+testrun_suffix: ""
+suite_name: ""
+update_run: ""
+req_prefix:
+distro:
+    arch: "x86_64"
+    variant: None
+    name: None
+    major: None
+    minor: None
+base_queries:
+    - ""
+environment_file: ""
+jenkins_url: ""

@@ -51,7 +51,7 @@ def print_tr(obj, fld):
     print fld, "=", getattr(obj, fld)
 
 
-class Suite(object):
+class Exporter(object):
     """
     A collection of TestCase objects.
     """
@@ -205,6 +205,23 @@ class Suite(object):
         """
         pass
 
+    def cfg(self):
+        """
+        Kicks everything off
+
+        :return:
+        """
+        import polarion_testng.configuration as pcfg
+
+        configurators = []
+        env_cfg = pcfg.OSEnvironmentConfigurator()
+        cli_cfg = pcfg.CLIConfigurator()
+        yml_cfg = pcfg.YAMLConfigurator()
+        if cli_cfg.args.environment:
+            jnk_cfg = pcfg.JenkinsConfigurator()
+
+
+
 # FIXME: this has gotten huge.  Let's turn this into a separate function or class
 # Also, we should have a config file, where the CLI will override the config file
 if __name__ == "__main__":
@@ -248,7 +265,7 @@ if __name__ == "__main__":
         sys.exit(0)
     if test_env is not None:
         log.info("Overriding other arguments passed in from CLI")
-        te = get_test_environment(test_env)
+        te = get_test_environment(test_env, )
         results_path = te.results_path
         log.info("\tresults_path is now {}".format(results_path))
         project_id = te.project_id
@@ -299,15 +316,15 @@ if __name__ == "__main__":
     transformer = Transformer(project_id, results_path, template_id, base_queries=default_queries, test_env=te)
     if OLD_EXPORTER:
         # Will auto-generate polarion TestCases
-        suite = Suite(results_path)
+        suite = Exporter(results_path)
     else:
-        suite = Suite(transformer)
+        suite = Exporter(transformer)
 
     # Once the suite object has been initialized, generate a test run with associated test records
     if not gen_only:
         if update_id:
             log.info("Updating test run {}".format(update_id))
-            tr = Suite.get_test_run(update_id)
+            tr = Exporter.get_test_run(update_id)
             suite.update_test_run(tr)
         else:
             log.info("Creating new TestRun...")

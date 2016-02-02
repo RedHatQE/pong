@@ -1,6 +1,7 @@
 import datetime
 import ssl
 import platform
+import types
 from functools import wraps
 from polarion_testng.logger import log
 
@@ -71,3 +72,34 @@ def retry(fn):
         else:
             return result
     return outer
+
+
+###################################################################
+# FIXME:  These belong somewhere else
+###################################################################
+
+def cycle(seq):
+    """
+    Not a decorator, but this will repeatedly cycle through the elements of seq
+    :param seq:
+    :return:
+    """
+    while True:
+        # python3
+        # yield from seq
+        for x in seq:
+            yield x
+
+
+def repeat(val):
+    """
+    What's this good for?  If you want to populate a list with the same item
+
+    Usage:
+        import toolz
+        ten_zeroes = toolz.take(10, repeat(0))
+    :param val:
+    :return:
+    """
+    while True:
+        yield val
