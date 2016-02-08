@@ -67,11 +67,15 @@ class TestNGToPolarion(object):
         :return:
         """
         if self._status is None:
-            result = PASS
+            result = self.attributes["status"]
             if any(filter(lambda ti: ti.status != "PASS" or ti.status != "SKIP", self.step_results)):
                 result = FAIL
             self._status = result
         return self._status
+
+    @status.setter
+    def status(self, val):
+        log.error("Can not set self.status.  Value of {} being ignored".format(val))
 
     @property
     def author(self):
