@@ -1,6 +1,7 @@
 import re
 import os
 import ConfigParser
+from functools import partial
 
 from toolz import itertoolz as itz
 from toolz import functoolz as ftz
@@ -189,7 +190,7 @@ def make_test_run_id_from_latest(test_run):
     :param test_run: TestRun object
     :return: str
     """
-    patt = re.compile(r"([a-zA-Z ]+)(\d+)$")
+    patt = re.compile(r"([a-zA-Z\-_: ]+)(\d+)$")
     m = patt.search(test_run.test_run_id)
     base_id = test_run.test_run_id
     if m:
@@ -257,3 +258,38 @@ def testify_requirement_name(test_name, prefix="RHSM "):
     :return:
     """
     return prefix + test_name
+
+
+def public_field(obj, f):
+    """
+    Predicate function that sees if field f in an object is neither callable nor private
+
+    Useful in filtering functions to print fields in an object
+
+    :param obj: The object to check
+    :param f: string which is the name of a field in the object
+    :return: bool
+    """
+    result = False
+    try:
+        no_under = not f.startswith("_")
+        attrib = getattr(obj, f)
+        return no_under and (attrib and not callable(attrib))
+    except AttributeError:
+        pass
+    except TypeError:
+        pass
+    return result
+
+
+def make_iterable(obj):
+    """
+    Takes an arbitrary object and returns the fields which are public and not callable
+
+    :param obj:
+    :return:
+    """
+    valid = partial(public_field, obj)
+    items = filter(valid, dir(obj))
+    for i in items:
+        yield i, getattr(obj, i)
