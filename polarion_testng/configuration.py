@@ -23,11 +23,15 @@ from polarion_testng.utils import *
 from polarion_testng.logger import log
 import shutil
 import os
+import sys
 import yaml
-from toolz.functoolz import compose, partial
+from collections import Sequence
+import toolz
+from toolz.functoolz import partial, compose
 from pyrsistent import PRecord, field
 import pyrsistent as pyr
 from abc import ABCMeta, abstractmethod
+from functools import wraps
 
 try:
     import configparser
@@ -37,6 +41,77 @@ except ImportError as e:
 
 def fieldm():
     return field(mandatory=True)
+
+
+def validate(invariant, fn):
+    """
+    Returns an invariant function that can be used by a PRecord field
+
+    :param invariant: a string describing the invariant
+    :param fn: the function that will test field value (takes field value, returns true or false)
+    :return:
+    """
+    @wraps(fn)
+    def inner(x):
+        return fn(x), invariant
+    return inner
+
+
+def not_none(x):
+    """
+    Invariant for the PRecord such that the field value is not None
+
+    :param x:
+    :return:
+    """
+    return x is not None
+
+
+def non_empty_string(x):
+    """
+    Invariant for a PREcord such that the field value is not an empty string
+    :param x:
+    :return:
+    """
+    result = False
+    if isinstance(x, str) or isinstance(x, unicode):
+        result = x.strip() != ""
+    return result
+
+
+def is_sequence(x):
+    return True if isinstance(x, Sequence) and x else False
+
+
+def sequence_vals_truthy(s):
+    if not isinstance(s, Sequence):
+        return False
+    for x in s:
+        if isinstance(x, str) and x.strip() == "":
+            return False
+        if not x:
+            return False
+    else:
+        return True
+
+
+def valid_distro(x):
+    """
+    Validates that arg is a Distro type, and has
+    :param x:
+    :return:
+    """
+    if not isinstance(x, Distro):
+        return False
+
+    result = True
+    for required in ["arch", "variant"]:
+        val = getattr(x, required)
+        if not isinstance(val, str):
+            result = False
+        elif val.strip() == "":
+            result = False
+    return result
 
 
 def start_configuration():
@@ -53,12 +128,12 @@ class FieldFactory(object):
         self.short_names = set()
         self.parser = parser if parser else ArgumentParser()
 
-    def field_factory(self, long_name, short_name=None, **kwargs):
+    def field_factory(self, *args, **kwargs):
         """
         This function does two things:  it forwards args to parser.add_arguments, and other args to field()
 
-        Since there are no name-collisions in the keyword args for add_argument or field, we will direct them
-        accordingly
+        There is one keyword collision for add_argument and field, which is 'type'.  If 'type' exists, we will
+        use it for field
 
         :param long_name: The "--long-arg" name
         :param short_name:
@@ -67,9 +142,13 @@ class FieldFactory(object):
         :param kwargs:
         :return:
         """
+        short_name = None
+        if len(args) == 2:
+            long_name = args[1]
+            short_name = args[0]
+        elif len(args) == 1:
+            long_name = args[0]
 
-        long_name = long_name
-        short_name = short_name
         if short_name is not None and short_name in self.short_names:
             log.warning("{0} already used.  Not setting {0} for {1}".format(short_name, long_name))
         else:
@@ -78,9 +157,8 @@ class FieldFactory(object):
         if "short_name" in kwargs:
             kwargs.pop("short_name")
 
-
         parser_kwargs = {}
-        for x in ["required", "nargs", "choices", "default", "help"]:
+        for x in ["required", "nargs", "choices", "default", "help", "dest"]:
             if x in kwargs:
                 parser_kwargs[x] = kwargs.pop(x)
         field_kwargs = kwargs
@@ -89,6 +167,8 @@ class FieldFactory(object):
             self.parser.add_argument(short_name, long_name, **parser_kwargs)
         else:
             self.parser.add_argument(long_name, **parser_kwargs)
+
+        # print "Option {}:".format(long_name), field_kwargs
         return field(**field_kwargs)
 
 
@@ -120,6 +200,11 @@ class Configurator(object):
         """Takes in a PMap and returns a transformed map"""
         pass
 
+    def __iter__(self):
+        for x in dir(self):
+            if not x.startswith("_") and not callable(x):
+                yield x, getattr(self, x)
+
 
 class Distro(PRecord):
     arch = field()
@@ -137,32 +222,56 @@ class CLIConfigRecord(PRecord):
     """
     factory = FieldFactory()
     add_field = factory.field_factory
-    distro = add_field("-d", "--distro", type=Distro,
+    distro = add_field("-d", "--distro",
+                       invariant=validate("distro is a Distro type", valid_distro),
+                       type=Distro,
                        help="Reads in the arch, variant, name, major and minor in the form of a json dict"
                             "eg {'arch': 'x86_64', 'variant': 'Server', 'name': RedHatEnterpriseLinux-6.8',"
                             "'major': 6, 'minor': 8}.  If used, must supply arch and variant")
-    artifact_archive = add_field("-a", "--artifact-archive", default="test-output/testng-results.xml",
+    artifact_archive = add_field("-a", "--artifact-archive",
+                                 default="test-output/testng-results.xml",
                                  help="Used when run from a jenkins job, the jenkins job should use the Post-build"
                                       "Actions -> Archive the artifacts -> Files to archive, and the value"
                                       "entered there for the testng-result.xml should be entered here")
-    result_path = add_field("-r", "--result-path",
+    result_path = add_field("-r", "--result-path", type=str,
+                            invariant=lambda x: ((x is not None, "result_path is not None"),
+                                                 (x.strip() != "", "result_path is not empty string")),
                             help="Path or URL of testng-results.xml file to parse.  If --environment-file "
                                  "is also specified, this field is overridden")
-    project_id = add_field("-p", "--project-id", mandatory=True,
-                           help="The Polarion project id.  Will override what is in .pylarion file")
-    pylarion_path = add_field("-P", "--pylarion-path", mandatory=True, default=os.path.expanduser("~/.pylarion"),
+    project_id = add_field("-p", "--project-id",
+                           invariant=validate("project_id not empty", non_empty_string),
+                           help="The Polarion project id.  Will override what is in .pylarion file",
+                           mandatory=True)
+    pylarion_path = add_field("-P", "--pylarion-path",
+                              mandatory=True,
+                              default=os.path.expanduser("~/.pylarion"),
                               help="Path to the .pylarion file (defaults to ~/.pylarion")
-    pylarion_user = add_field("-u", "--user", help="The username in Polarion to run test as (overrides .pylarion)")
-    pylarion_password = add_field("--password", help="The password to use for Polarion (overrides .pylarion)")
-    testrun_template = add_field("-t", "--testrun-template", mandatory=True,
-                                 help="The template name in Polarion that the test run is based off of")
-    testrun_prefix = add_field("--testrun-prefix", mandatory=True,
+    pylarion_user = add_field("-u", "--user",
+                              help="The username in Polarion to run test as (overrides .pylarion)",
+                              dest="pylarion_user")
+    pylarion_password = add_field("--password",
+                                  help="The password to use for Polarion (overrides .pylarion)",
+                                  dest="pylarion_password")
+    testrun_template = add_field("-t", "--testrun-template",
+                                 invariant=validate("testrun_template is not empty string", non_empty_string),
+                                 help="The Polarion template name that the test run is based off of",
+                                 mandatory=True)
+    testrun_prefix = add_field("--testrun-prefix",
+                               mandatory=True,
+                               invariant=validate("testrun_prefix is not empty string", non_empty_string),
                                help="The testrun id is generated as: "
                                     "'{} {} {} {}'.format(prefix, suffix, suite, unique")
-    testrun_suffix = add_field("--testrun-suffix", help="See testrun_prefix")
-    suite_name = add_field("--suite-name",
-                           help="See testrun_prefix.  Defaults to the <suite name=> from the testng-results.xml")
-    base_queries = add_field("-b", "--base-queries", mandatory=True, nargs='*',
+    testrun_suffix = add_field("--testrun-suffix",
+                               help="See testrun_prefix",
+                               default="")
+    testrun_base = add_field("--testrun-base",
+                             help="See testrun_prefix.  Defaults to the <suite name=> from the testng-results.xml")
+    base_queries = add_field("-b", "--base-queries",
+                             mandatory=True,
+                             nargs='*',
+                             invariant=lambda x: ((x is not None, "base_queries is not None"),
+                                                  (is_sequence(x), "base_queries is a sequence"),
+                                                  (sequence_vals_truthy(x), "base_queries values are truthy")),
                              help="A sequence of strings that will be used for TestCase title searches "
                                   "eg 'title:<base_query>')")
     environment_file = add_field("-e", "--environment-file",
@@ -170,23 +279,29 @@ class CLIConfigRecord(PRecord):
                                       "the results_path even on the CLI")
 
     # These are "functions"
-    update_run = add_field("--update-run", help="If given, the arg will be used to find and update an existing "
+    update_run = add_field("--update-run", default=False,
+                           help="If given, the arg will be used to find and update an existing "
                                                 "Polarion TestRun with the testng-results.xml")
-    set_project = add_field("--set-project",
+    set_project = add_field("--set-project", default=False,
                             help="If project_id, user, or password are given, write to the pylarion_path")
-    query_testcase = add_field("--query-testcase", help="Find a testcase by title, and print out information")
-    get_default_project_id = add_field("--get-default-project-id", help="Gets the .pylarion project id")
-    generate_only = add_field("--generate-only",
+    query_testcase = add_field("--query-testcase", default=False,
+                               help="Find a testcase by title, and print out information")
+    get_default_project_id = add_field("--get-default-project-id", default=False,
+                                       help="Gets the .pylarion project id")
+    generate_only = add_field("--generate-only", default=False,
                               help="Only create/update TestCases and Requirements based on the testng-results.xml")
-    get_latest_testrun = add_field("--get-latest-testrun",
+    get_latest_testrun = add_field("--get-latest-testrun", default=False,
                                    help="The supplied arg should be a base string minus the unique identifier"
                                         " of a test run.  For example, if the testrun id is 'exporter testing 1'"
                                         "then the supplied arg will be 'exporter testing'.  A query will be performed"
                                         "to retrieve the title of the most recent run")
 
     @classmethod
-    def parse_args(cls):
-        return cls.factory.parser.parse_args()
+    def parse_args(cls, args=""):
+        if args:
+            return cls.factory.parser.parse_args(args.split())
+        else:
+            return cls.factory.parser.parse_args()
 
 
 class OSEnvironmentRecord(PRecord):
@@ -205,12 +320,9 @@ class JenkinsRecord(PRecord):
     the downstream job to run correctly.  Required for an automation run in jenkins but optional
     """
     distro = field(mandatory=True, type=Distro)
-    upstream_workspace = fieldm()
-    upstream_slave = fieldm()
-    upstream_job_name = fieldm()
-    upstream_build_number = fieldm()
-    results_path = fieldm()
+    result_path = fieldm()
     project_id = field()
+    testrun_suffix = field()
 
 
 class ConfigRecord(PRecord):
@@ -229,7 +341,7 @@ class ConfigRecord(PRecord):
     testrun_template = fieldm()
     testrun_prefix = fieldm()
     testrun_suffix = fieldm()
-    suite_name = fieldm()
+    testrun_base = fieldm()
     base_queries = fieldm()
     environment_file = field()
 
@@ -242,11 +354,51 @@ class ConfigRecord(PRecord):
 
 
 class JenkinsConfigurator(Configurator):
-    def __init__(self):
+    fields = ["DISTRO_ARCH", "DISTRO_VARIANT", "RHELX", "RHELY", "BUILD_URL", "COMPOSE_ID"]
+    mapper = [("distro_arch", "arch"), ("distro_variant", "variant"), ("compose_id", "name"),
+              ("rhelx", "major"), ("rhely", "minor")]
+
+    def __init__(self, test_env_path):
         super(JenkinsConfigurator, self).__init__()
+        self.file_path = test_env_path
+        if not os.path.exists(self.file_path):
+            raise Exception("The test environment file {} doesn't exist".format(self.file_path))
+
+        cfgparser = ConfigParser.ConfigParser()
+        cfgparser.read([self.file_path])
+        get = partial(cfgparser.get, "test_environment")
+        self.dict_args = dict([(k.lower(), get(k)) for k in self.fields if get(k) is not None])
+
+        dict_keys = {"distro": self._make_distro()}
+        if self.dict_args["rhelx"] == "6":
+            dict_keys["project_id"] = "RHEL6"
+        elif self.dict_args["rhelx"] == "7":
+            dict_keys["project_id"] = "RedHatEnterpriseLinux7"
+        else:
+            log.error("Unknown project ID")
+
+        dict_keys["result_path"] = self.dict_args["build_url"]
+        dict_keys["testrun_suffix"] = self.dict_args["compose_id"]
+        self.jenkins_record = JenkinsRecord(**dict_keys)
+
+    def _make_distro(self):
+        """
+        Creates a Distro object
+
+        :param cfgparser:
+        :return:
+        """
+        mapped_dict = {}
+        for orig, new in self.mapper:
+            mapped_dict[new] = self.dict_args[orig]
+        return Distro(**mapped_dict)
 
     def __call__(self, omap):
         self.original_map = omap
+        updated = omap.update(self.jenkins_record)
+        log.debug("=================== {} ====================".format(self.__class__))
+        dprint(updated)
+        return updated
 
 
 class YAMLRecord(PRecord):
@@ -259,13 +411,11 @@ class YAMLRecord(PRecord):
     testrun_template = field()
     testrun_prefix = field()
     testrun_suffix = field()
-    suite_name = field()
-    update_run = field()
-    req_prefix = field()
+    testrun_base = field()
     distro = field(mandatory=True, type=Distro)
     base_queries = field()
     environment_file = field()
-    jenkins_url = field()
+    build_url = field()
 
 
 class OSEnvironmentConfigurator(Configurator):
@@ -274,11 +424,15 @@ class OSEnvironmentConfigurator(Configurator):
 
     def __call__(self, config_map):
         self.original_map = config_map
-        return self._make_record()
+        updated = config_map.update(self._make_record())
+        log.debug("=================== {} ====================".format(self.__class__))
+        dprint(updated)
+        return updated
 
     def _make_record(self):
         env_keys, d_keys = self.get_valid_keys()
-        env_keys["distro"] = Distro(**d_keys)
+        if d_keys:
+            env_keys["distro"] = Distro(**d_keys)
         rec = OSEnvironmentRecord(**env_keys)
         self.os_env_record = rec
         return self.os_env_record
@@ -292,20 +446,12 @@ class OSEnvironmentConfigurator(Configurator):
         return validk, validd
 
 
-class TestEnvironmentConfigurator(Configurator):
-
-    def __init__(self, file_path):
-        super(TestEnvironmentConfigurator, self).__init__()
-        self.file_path = file_path
-
-
-
-
 class CLIConfigurator(Configurator):
-    def __init__(self, parser=ArgumentParser()):
+    def __init__(self, parser=ArgumentParser(), args="", jnk_cfg=None):
         super(CLIConfigurator, self).__init__()
+        self.jnk_cfg = jnk_cfg
         self.parser = parser
-        self.args = CLIConfigRecord.parse_args()
+        self.args = CLIConfigRecord.parse_args(args=args)
         self.dict_args = vars(self.args)
         self.reset_project_id = False
         self.pylarion_path = self.get_pylarion_path()
@@ -317,7 +463,6 @@ class CLIConfigurator(Configurator):
         Parses the self.args.distro argument.
         :return:
         """
-        import json
         if self.args.distro:
             distro = dict(kv.split(":") for kv in self.args.distro.split(","))
             required = ["arch", "variant"]
@@ -333,14 +478,35 @@ class CLIConfigurator(Configurator):
 
     def __call__(self, omap):
         self.original_map = omap
+        log.debug("------------------- BEFORE: {} -----------------------".format(self.__class__))
+        dprint(omap)
+
         distro_record = self._make_distro_record()
         if self.args.distro:
             self.dict_args["distro"] = distro_record
 
         # Before we modify the map, let's see if an environment file was passed in
+        newmap = self.original_map
+        if self.jnk_cfg:
+            newmap = self.jnk_cfg(omap)
         if self.args.environment_file:
+            jenkins_cfg = JenkinsConfigurator(self.args.environment_file)
+            newmap = jenkins_cfg(omap)
 
-        return self.original_map.update(self.dict_args)
+        art_path = "artifact/{}".format(self.args.artifact_archive)
+        # result_path has to come either from -r or -e
+        try:
+            artifact = newmap["result_path"] + art_path
+        except KeyError:
+            artifact = self.args.result_path
+        self.dict_args["result_path"] = artifact
+
+        # Trim any args from self.dict_args that are None
+        final_args = {k: v for k, v in self.dict_args.items() if v is not None}
+        updated = newmap.update(final_args)
+        log.debug("=================== {} ====================".format(self.__class__))
+        dprint(updated)
+        return updated
 
     # This doesn't belong to this class
     def get_pylarion_path(self, cfg_map=None):
@@ -360,7 +526,7 @@ class CLIConfigurator(Configurator):
 class YAMLConfigurator(Configurator):
     def __init__(self, cfg_path=None):
         if cfg_path is None:
-            self.cfg_path = os.path.expanduser("~/config_map.hy")
+            self.cfg_path = os.path.expanduser("~/exporter.yml")
         super(YAMLConfigurator, self).__init__()
 
         if not os.path.exists(self.cfg_path):
@@ -370,13 +536,27 @@ class YAMLConfigurator(Configurator):
                 cfg_dict = yaml.load(cfg)
 
             # Filter out the key-vals where the value is a falsey value
-            final = {k: v for k, v in cfg_dict.items() if bool(v)}
+            def trim_falseys(d):
+                for k, v in d.items():
+                    if isinstance(v, dict):
+                        trim_falseys(v)
+                    else:
+                        if not bool(v):
+                            d.pop(k)
+            trim_falseys(cfg_dict)
 
             # If distro in final, create a Distro record
-            if "distro" in final:
-                distro_dict = {"distro": final["distro"]}
-                final["distro"] = Distro(**distro_dict)
-            self.record = YAMLRecord(**final)
+            if "distro" in cfg_dict:
+                distro_dict = dict(zip(cfg_dict["distro"].keys(), cfg_dict["distro"].values()))
+                # distro_dict = {k: cfg_dict["distro"][k] for k in distro_keys}
+                cfg_dict["distro"] = Distro(**distro_dict)
+
+            # Some of the YAML records are nested dicts. so we need to convert them
+            keys = ["testrun_{}".format(k) for k in cfg_dict["testrun"].keys()]
+            for k in keys:
+                cfg_dict[k] = cfg_dict["testrun"][k.replace("testrun_", "")]
+            cfg_dict.pop("testrun")
+            self.record = YAMLRecord(**cfg_dict)
 
     def __call__(self, omap):
         """
@@ -385,11 +565,39 @@ class YAMLConfigurator(Configurator):
         :return:
         """
         self.original_map = omap
-        return omap.update(self.record)
+        updated = omap.update(self.record)
+        log.debug("=================== {} ====================".format(self.__class__))
+        dprint(updated)
+        return updated
 
 
-def final_configure(pipelined_map):
-    return ConfigRecord(**pipelined_map)
+class PylarionRecord(PRecord):
+    project_id = fieldm()
+
+
+class PylarionConfigurator(Configurator):
+    def __init__(self, path=os.path.expanduser("~/.pylarion")):
+        super(PylarionConfigurator, self).__init__()
+        self.path = path
+
+        cfg = ConfigParser.ConfigParser()
+        cfg.read(self.path)
+        get = partial(cfg.get, "webservice")
+        # pyl = {k: get(k) for k in ["user", "password", "default_project"]}
+        # pyl["project_id"] = pyl.pop("default_project")
+        pyl = {"project_id": get("default_project")}
+        self.pylarion_record = PylarionRecord(**pyl)
+
+    def __call__(self, omap):
+        self.original_map = omap
+        updated = omap.update(self.pylarion_record)
+        log.debug("=================== {} ====================".format(self.__class__))
+        dprint(updated)
+        return updated
+
+
+def finalize(pipelined_map):
+    return CLIConfigRecord(**pipelined_map)
 
 
 ##############################################################################
@@ -456,9 +664,41 @@ def create_backup(orig, backup=None):
     return shutil.copy(orig, backup_path)
 
 
-if __name__ == "__main__":
-    start_map = start_configuration()
+def dprint(m):
+    for k, v in m.items():
+        log.debug("{}={}".format(k, v))
 
+
+def kickstart(yaml_path=None):
+    """
+    Kicks everything off by creating the configuration function pipeline
+
+    :return:
+    """
+    start_map = pyr.m()
+    pyl_cfg = PylarionConfigurator()
+    env_cfg = OSEnvironmentConfigurator()
+    yml_cfg = YAMLConfigurator(cfg_path=yaml_path)
     cli_cfg = CLIConfigurator()
-    end_map = cli_cfg(start_map)
-    print cli_cfg
+
+    pipeline = compose(cli_cfg, yml_cfg, env_cfg, pyl_cfg)
+    end_map = pipeline(start_map)
+
+    log.info("====================end_map====================")
+    dprint(end_map)
+
+    final = CLIConfigRecord(**end_map)
+
+    log.debug("================= final ====================")
+    dprint(final)
+
+    result = {"pyl_cfg": pyl_cfg,
+              "env_cfg": env_cfg,
+              "yml_cfg": yml_cfg,
+              "cli_cfg": cli_cfg,
+              "config": final}
+    return result
+
+
+if __name__ == "__main__":
+    result = kickstart()
