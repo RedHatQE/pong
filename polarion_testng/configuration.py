@@ -499,6 +499,8 @@ class CLIConfigurator(Configurator):
             artifact = newmap["result_path"] + art_path
         except KeyError:
             artifact = self.args.result_path
+            if artifact.startswith("http"):
+                artifact += art_path
         self.dict_args["result_path"] = artifact
 
         # Trim any args from self.dict_args that are None
@@ -684,7 +686,7 @@ def kickstart(yaml_path=None):
     pipeline = compose(cli_cfg, yml_cfg, env_cfg, pyl_cfg)
     end_map = pipeline(start_map)
 
-    log.info("====================end_map====================")
+    log.debug("====================end_map====================")
     dprint(end_map)
 
     final = CLIConfigRecord(**end_map)
