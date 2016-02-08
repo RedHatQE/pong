@@ -301,36 +301,32 @@ class Transformer(object):
 
          - Generate a TestCase if needed, and link to the Requirement of the <test>
     """
-    def __init__(self, project_id, results_path, template_id, requirement_prefix=TEST_REQUIREMENT_PREFIX,
-                 testrun_prefix="", test_env=None, existing_reqs=None, quick_query=True, base_queries=None,
-                 testrun_suffix="testing"):
+    # def __init__(self, project_id=None, result_path=None, template_id, requirement_prefix=TEST_REQUIREMENT_PREFIX,
+    #             testrun_prefix="", existing_reqs=None, quick_query=True, base_queries=None,
+    #             testrun_suffix="testing"):
+    def __init__(self, config, requirement_prefix=TEST_REQUIREMENT_PREFIX, existing_reqs=None, quick_query=True, ):
         """
 
         :param project_id:
-        :param results_path:
+        :param result_path:
         :param template_id:
         :param requirement_prefix:
         :param testrun_prefix:
-        :param distro:
         :param existing_reqs:
         :param quick_query:
+        :param base_queries:
+        :param testrun_suffix:
         :return:
         """
-        self.testrun_prefix = testrun_prefix
-        self.testrun_suffix = testrun_suffix
-        self.template_id = template_id
-        self.results_path = results_path
-        self.project_id = project_id
+        self.testrun_prefix = config.testrun_prefix
+        self.testrun_suffix = config.testrun_suffix
+        self.template_id = config.testrun_template
+        self.result_path = config.result_path
+        self.project_id = config.project_id
         self.requirement_prefix = requirement_prefix
         self._existing_requirements = existing_reqs
         self.quick_query = quick_query
-        self.base_queries = [] if base_queries is None else base_queries
-        self.test_env = test_env
-
-        # If our test_env is not None, that means we're using a test_environment file to get some arguments
-        if test_env is not None:
-            self.project_id = test_env.project_id
-            self.results_path = test_env.results_path
+        self.base_queries = [] if config.base_queries is None else config.base_queries
 
         existing_test_cases = []
         for base in self.base_queries:
@@ -342,8 +338,9 @@ class Transformer(object):
 
     def generate_base_testrun_id(self, suite_name):
         """
-        Generates a base testrun_id
+        Generates a name that can be used to look up testruns
 
+        :param suite_name:
         :return:
         """
         return "{} {} {}".format(self.testrun_prefix, suite_name, self.testrun_suffix)
@@ -377,8 +374,8 @@ class Transformer(object):
         :param req_prefix:
         :return:
         """
-        log.info("Beginning parsing of {}...".format(self.results_path))
-        suites = self.parse_by_element(self.results_path, "suite")
+        log.info("Beginning parsing of {}...".format(self.result_path))
+        suites = self.parse_by_element(self.result_path, "suite")
 
         testng_suites = {}
         for suite in suites:
@@ -428,7 +425,7 @@ class Transformer(object):
             # FIXME: This shouldn't happen, but what happens if it does?
             if req is None:
                 log.error("No requirements were found or created")
-            self.parse_test_methods(test, titles=titles, tests=tests, requirement=req)
+            _, t = self.parse_test_methods(test, titles=titles, tests=tests, requirement=req)
 
         log.info("End parsing of xml results file")
         return tests
@@ -554,7 +551,7 @@ class TNGTestMethod(object):
 
     def _make_testiterationresult(self, test_elem):
         result = None
-        if 'data_provider' in self.attribs:
+        if 'data-provider' in self.attribs:
             args = get_data_provider_elements(test_elem)
             result = TestIterationResult(test_elem.attrib, params=args, exception=get_exception(test_elem))
         return result
@@ -567,8 +564,9 @@ class TNGTestMethod(object):
         :param testng_test_name: the name of the test from the testng results.xml
         :return:
         """
+        params = [] if self.result is None else self.result.params
         testng = TestNGToPolarion(self.attribs, title=self.full_name, test_case=self.p_testcase,
-                                  result=self.result, params=self.result.params, requirement=requirement_id,
+                                  result=self.result, params=params, requirement=requirement_id,
                                   testng_test=testng_test_name)
 
         return testng
