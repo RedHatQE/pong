@@ -15,3 +15,7 @@ database.  This includes the following features:
 
 Architecture and Design
 =======================
+
+polarion_testng is split into several modules:
+
+- exporter:  T

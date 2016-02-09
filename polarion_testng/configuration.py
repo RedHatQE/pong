@@ -231,7 +231,7 @@ class ConfigRecord(PRecord):
     testrun_template = fieldm()
     testrun_prefix = fieldm()
     testrun_suffix = fieldm()
-    testrun_base = fieldm()
+    testrun_base = field()
     base_queries = fieldm()
     environment_file = field()
     exporter_config = field()
@@ -242,6 +242,7 @@ class ConfigRecord(PRecord):
     get_default_project_id = field()
     generate_only = field()
     get_latest_testrun = field()
+    query_testcase = field()
 
 
 class JenkinsRecord(PRecord):
@@ -612,7 +613,7 @@ class PylarionConfigurator(Configurator):
 
 
 def finalize(pipelined_map):
-    return CLIConfigRecord(**pipelined_map)
+    return ConfigRecord(**pipelined_map)
 
 
 ##############################################################################
@@ -705,9 +706,13 @@ def kickstart(yaml_path=None):
     yml_cfg = YAMLConfigurator(cfg_path=yaml_path)
     cli_cfg = CLIConfigurator()
 
-    pipeline = compose(finalize, cli_cfg, yml_cfg, env_cfg, pyl_cfg)
-    final = pipeline(start_map)
+    pipeline = compose(cli_cfg, yml_cfg, env_cfg, pyl_cfg)
+    end_map = pipeline(start_map)
 
+    log.debug("================ end_map ===================")
+    dprint(end_map)
+
+    final = ConfigRecord(**end_map)
     log.debug("================= final ====================")
     dprint(final)
 

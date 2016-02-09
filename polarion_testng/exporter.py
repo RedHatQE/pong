@@ -130,7 +130,7 @@ class Exporter(object):
             for tc in testngs:
                 tc.create_test_record(test_run, run_by=runner)
 
-            log.info("Created test run for {}".format(s))
+            log.info("Created test run for {}".format(new_id))
             test_run.status = "finished"
 
     def update_test_run(self, test_run, runner="stoner"):
