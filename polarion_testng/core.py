@@ -139,10 +139,8 @@ class TestNGToPolarion(object):
             time_delta = dt_finish - dt_start
             duration = time_delta.seconds + float(last_step.duration)
         else:
-            if len(self.step_results) >= 1:
-                raise Exception("Should be at least one step_results")
-            duration = float(self.step_results[0].duration)
-            dt_start = strptime(self.step_results[0].started, formatter)
+            duration = float(self.attributes["duration-ms"])
+            dt_start = strptime(self.attributes["started-at"], formatter)
 
         result = convert_status(result)
         if result == "waiting":

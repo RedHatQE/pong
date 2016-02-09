@@ -327,6 +327,7 @@ class Transformer(object):
         self._existing_requirements = existing_reqs
         self.quick_query = quick_query
         self.base_queries = [] if config.base_queries is None else config.base_queries
+        self.config = config
 
         existing_test_cases = []
         for base in self.base_queries:

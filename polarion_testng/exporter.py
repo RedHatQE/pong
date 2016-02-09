@@ -126,6 +126,8 @@ class Exporter(object):
             test_run.status = "inprogress"
             log.info("Creating test run for {}".format(s))
 
+            tr._set_custom_field("arch", self.transformer.config.distro.arch)
+            tr._set_custom_field("variant", self.transformer.config.distro.variant)
             for tc in testngs:
                 tc.create_test_record(test_run, run_by=runner)
 
@@ -217,7 +219,7 @@ class Exporter(object):
             log.info(get_default_project())
         if args.set_project:
             reset_project_id = True
-            cli.set_project_id()
+            cli.set_project_id(config.pylarion_path, config.set_project)
         if args.get_latest_testrun:
             tr = get_latest_test_run(args.get_latest_testrun)
             for k, v in make_iterable(tr):
