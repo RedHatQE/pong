@@ -317,7 +317,7 @@ class OSEnvironmentRecord(PRecord):
 
 class OSEnvironmentConfigurator(Configurator):
     distro_keys = ['DISTRO_ARCH', 'DISTRO_VARIANT', 'DISTRO_MAJOR', 'DISTRO_MINOR']
-    valid_keys = ['BUILD_URL', 'RESULT_PATH', 'PROJECT_ID', 'EXPORTER_CONFIG']
+    valid_keys = ['RESULT_PATH', 'PROJECT_ID', 'EXPORTER_CONFIG']
 
     def __call__(self, config_map):
         self.original_map = config_map
