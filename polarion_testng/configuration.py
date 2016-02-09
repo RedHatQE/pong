@@ -214,11 +214,137 @@ class Distro(PRecord):
     minor = field()
 
 
-class CLIConfigRecord(PRecord):
+class ConfigRecord(PRecord):
     """
     This is the master record which will be passed in at the beginning of the pipeline.
-    All Configurator types will take an object of this as input, and return a transformed
-    (but not mutated) object to pass to the next one
+    After all Configurator types have been run through the pipeline, an object of this type will be
+    returned.  In other words, the Configurators build up immutable PMaps which are merged
+    to create a new PMap, and at the end, finalize() is called to generate this map
+    """
+    distro = field(mandatory=True, type=Distro)
+    artifact_archive = field()
+    result_path = field()
+    project_id = fieldm()
+    pylarion_path = fieldm()
+    pylarion_user = field()
+    pylarion_password = field()
+    testrun_template = fieldm()
+    testrun_prefix = fieldm()
+    testrun_suffix = fieldm()
+    testrun_base = fieldm()
+    base_queries = fieldm()
+    environment_file = field()
+    exporter_config = field()
+
+    # These are "functions"
+    update_run = field()
+    set_project = field()
+    get_default_project_id = field()
+    generate_only = field()
+    get_latest_testrun = field()
+
+
+class JenkinsRecord(PRecord):
+    """
+    Represents the information recorded by an upstream job that will be needed for
+    the downstream job to run correctly.  Required for an automation run in jenkins but optional
+    """
+    distro = field(mandatory=True, type=Distro)
+    result_path = fieldm()
+    project_id = field()
+    testrun_suffix = field()
+
+
+class JenkinsConfigurator(Configurator):
+    fields = ["DISTRO_ARCH", "DISTRO_VARIANT", "RHELX", "RHELY", "BUILD_URL", "COMPOSE_ID"]
+    mapper = [("distro_arch", "arch"), ("distro_variant", "variant"), ("compose_id", "name"),
+              ("rhelx", "major"), ("rhely", "minor")]
+
+    def __init__(self, test_env_path):
+        super(JenkinsConfigurator, self).__init__()
+        self.file_path = test_env_path
+        if not os.path.exists(self.file_path):
+            raise Exception("The test environment file {} doesn't exist".format(self.file_path))
+
+        cfgparser = ConfigParser.ConfigParser()
+        cfgparser.read([self.file_path])
+        get = partial(cfgparser.get, "test_environment")
+        self.dict_args = dict([(k.lower(), get(k)) for k in self.fields if get(k) is not None])
+
+        dict_keys = {"distro": self._make_distro()}
+        if self.dict_args["rhelx"] == "6":
+            dict_keys["project_id"] = "RHEL6"
+        elif self.dict_args["rhelx"] == "7":
+            dict_keys["project_id"] = "RedHatEnterpriseLinux7"
+        else:
+            log.error("Unknown project ID")
+
+        dict_keys["result_path"] = self.dict_args["build_url"]
+        dict_keys["testrun_suffix"] = self.dict_args["compose_id"]
+        self.jenkins_record = JenkinsRecord(**dict_keys)
+
+    def _make_distro(self):
+        """
+        Creates a Distro object
+
+        :param cfgparser:
+        :return:
+        """
+        mapped_dict = {}
+        for orig, new in self.mapper:
+            mapped_dict[new] = self.dict_args[orig]
+        return Distro(**mapped_dict)
+
+    def __call__(self, omap):
+        self.original_map = omap
+        updated = omap.update(self.jenkins_record)
+        log.debug("=================== {} ====================".format(self.__class__))
+        dprint(updated)
+        return updated
+
+
+class OSEnvironmentRecord(PRecord):
+    """
+    Fields that can be obtained from the OS environment
+    """
+    distro = field(type=Distro)
+    build_url = field()
+    result_path = field()
+    project_id = field()
+    exporter_config = field()
+
+
+class OSEnvironmentConfigurator(Configurator):
+    distro_keys = ['DISTRO_ARCH', 'DISTRO_VARIANT', 'DISTRO_MAJOR', 'DISTRO_MINOR']
+    valid_keys = ['BUILD_URL', 'RESULT_PATH', 'PROJECT_ID', 'EXPORTER_CONFIG']
+
+    def __call__(self, config_map):
+        self.original_map = config_map
+        updated = config_map.update(self._make_record())
+        log.debug("=================== {} ====================".format(self.__class__))
+        dprint(updated)
+        return updated
+
+    def _make_record(self):
+        env_keys, d_keys = self.get_valid_keys()
+        if d_keys:
+            env_keys["distro"] = Distro(**d_keys)
+        rec = OSEnvironmentRecord(**env_keys)
+        self.os_env_record = rec
+        return self.os_env_record
+
+    def get_valid_keys(self):
+        """Returns a dictionary which maps Environment variable names to keys in the ConfigRecord"""
+        env_keys = os.environ.keys()
+        validk = {k.lower(): os.environ[k] for k in filter(lambda x: x in self.valid_keys, env_keys)}
+        validd = {k.replace("DISTRO_", "").lower(): os.environ[k]
+                  for k in filter(lambda y: y in self.distro_keys, env_keys)}
+
+        return validk, validd
+
+
+class CLIConfigRecord(PRecord):
+    """
     """
     factory = FieldFactory()
     add_field = factory.field_factory
@@ -242,6 +368,9 @@ class CLIConfigRecord(PRecord):
                            invariant=validate("project_id not empty", non_empty_string),
                            help="The Polarion project id.  Will override what is in .pylarion file",
                            mandatory=True)
+    exporter_config = add_field("-c", "--exporter-config", default=os.path.expanduser("~/exporter.yml"),
+                                help="Path to configuration file.  Initial default is ~/exporter.yml.  Will"
+                                     "override EXPORTER_CONFIG env var")
     pylarion_path = add_field("-P", "--pylarion-path",
                               mandatory=True,
                               default=os.path.expanduser("~/.pylarion"),
@@ -302,148 +431,6 @@ class CLIConfigRecord(PRecord):
             return cls.factory.parser.parse_args(args.split())
         else:
             return cls.factory.parser.parse_args()
-
-
-class OSEnvironmentRecord(PRecord):
-    """
-    Fields that can be obtained from the OS environment
-    """
-    distro = field(type=Distro)
-    build_url = field()
-    result_path = field()
-    project_id = field()
-
-
-class JenkinsRecord(PRecord):
-    """
-    Represents the information recorded by an upstream job that will be needed for 
-    the downstream job to run correctly.  Required for an automation run in jenkins but optional
-    """
-    distro = field(mandatory=True, type=Distro)
-    result_path = fieldm()
-    project_id = field()
-    testrun_suffix = field()
-
-
-class ConfigRecord(PRecord):
-    """
-    This is the master record which will be passed in at the beginning of the pipeline.
-    All Configurator types will take an object of this as input, and return a transformed
-    (but not mutated) object to pass to the next one
-    """
-    distro = field(mandatory=True, type=Distro)
-    artifact_archive = field()
-    result_path = field()
-    project_id = fieldm()
-    pylarion_path = fieldm()
-    pylarion_user = field()
-    pylarion_password = field()
-    testrun_template = fieldm()
-    testrun_prefix = fieldm()
-    testrun_suffix = fieldm()
-    testrun_base = fieldm()
-    base_queries = fieldm()
-    environment_file = field()
-
-    # These are "functions"
-    update_run = field()
-    set_project = field()
-    get_default_project_id = field()
-    generate_only = field()
-    get_latest_testrun = field()
-
-
-class JenkinsConfigurator(Configurator):
-    fields = ["DISTRO_ARCH", "DISTRO_VARIANT", "RHELX", "RHELY", "BUILD_URL", "COMPOSE_ID"]
-    mapper = [("distro_arch", "arch"), ("distro_variant", "variant"), ("compose_id", "name"),
-              ("rhelx", "major"), ("rhely", "minor")]
-
-    def __init__(self, test_env_path):
-        super(JenkinsConfigurator, self).__init__()
-        self.file_path = test_env_path
-        if not os.path.exists(self.file_path):
-            raise Exception("The test environment file {} doesn't exist".format(self.file_path))
-
-        cfgparser = ConfigParser.ConfigParser()
-        cfgparser.read([self.file_path])
-        get = partial(cfgparser.get, "test_environment")
-        self.dict_args = dict([(k.lower(), get(k)) for k in self.fields if get(k) is not None])
-
-        dict_keys = {"distro": self._make_distro()}
-        if self.dict_args["rhelx"] == "6":
-            dict_keys["project_id"] = "RHEL6"
-        elif self.dict_args["rhelx"] == "7":
-            dict_keys["project_id"] = "RedHatEnterpriseLinux7"
-        else:
-            log.error("Unknown project ID")
-
-        dict_keys["result_path"] = self.dict_args["build_url"]
-        dict_keys["testrun_suffix"] = self.dict_args["compose_id"]
-        self.jenkins_record = JenkinsRecord(**dict_keys)
-
-    def _make_distro(self):
-        """
-        Creates a Distro object
-
-        :param cfgparser:
-        :return:
-        """
-        mapped_dict = {}
-        for orig, new in self.mapper:
-            mapped_dict[new] = self.dict_args[orig]
-        return Distro(**mapped_dict)
-
-    def __call__(self, omap):
-        self.original_map = omap
-        updated = omap.update(self.jenkins_record)
-        log.debug("=================== {} ====================".format(self.__class__))
-        dprint(updated)
-        return updated
-
-
-class YAMLRecord(PRecord):
-    """Keys in the YAML config file that we care about"""
-    pylarion_path = field()
-    user = field()
-    password = field()
-    result_path = field()
-    project_id = field()
-    testrun_template = field()
-    testrun_prefix = field()
-    testrun_suffix = field()
-    testrun_base = field()
-    distro = field(mandatory=True, type=Distro)
-    base_queries = field()
-    environment_file = field()
-    build_url = field()
-
-
-class OSEnvironmentConfigurator(Configurator):
-    distro_keys = ['DISTRO_ARCH', 'DISTRO_VARIANT', 'DISTRO_MAJOR', 'DISTRO_MINOR']
-    valid_keys = ['UPSTREAM_JOB_NAME', 'UPSTREAM_BUILD_NUMBER', 'RESULT_PATH', 'PROJECT_ID']
-
-    def __call__(self, config_map):
-        self.original_map = config_map
-        updated = config_map.update(self._make_record())
-        log.debug("=================== {} ====================".format(self.__class__))
-        dprint(updated)
-        return updated
-
-    def _make_record(self):
-        env_keys, d_keys = self.get_valid_keys()
-        if d_keys:
-            env_keys["distro"] = Distro(**d_keys)
-        rec = OSEnvironmentRecord(**env_keys)
-        self.os_env_record = rec
-        return self.os_env_record
-
-    def get_valid_keys(self):
-        """Returns a dictionary which maps Environment variable names to keys in the ConfigRecord"""
-        env_keys = os.environ.keys()
-        validk = {k.lower(): os.environ[k] for k in filter(lambda x: x in self.valid_keys, env_keys)}
-        validd = {k.replace("DISTRO_", "").lower(): os.environ[k]
-                  for k in filter(lambda y: y in self.distro_keys, env_keys)}
-        return validk, validd
 
 
 class CLIConfigurator(Configurator):
@@ -525,15 +512,41 @@ class CLIConfigurator(Configurator):
                 self.reset_project_id = True
 
 
+class YAMLRecord(PRecord):
+    """Keys in the YAML config file that we care about"""
+    pylarion_path = field()
+    user = field()
+    password = field()
+    result_path = field()
+    project_id = field()
+    testrun_template = field()
+    testrun_prefix = field()
+    testrun_suffix = field()
+    testrun_base = field()
+    distro = field(type=Distro)
+    base_queries = field()
+    environment_file = field()
+    build_url = field()
+
+
 class YAMLConfigurator(Configurator):
     def __init__(self, cfg_path=None):
-        if cfg_path is None:
-            self.cfg_path = os.path.expanduser("~/exporter.yml")
         super(YAMLConfigurator, self).__init__()
+        self._set_config_path(cfg_path)
 
-        if not os.path.exists(self.cfg_path):
-            self.record = YAMLRecord()
+    def _set_config_path(self, cfg_path):
+        if cfg_path is None:
+            cfg_path = os.path.expanduser("~/exporter.yml")
+        if not os.path.exists(cfg_path):
+            try:
+                self.cfg_path = os.environ["exporter_config"]
+            except KeyError:
+                self.cfg_path = None
+                self.record = YAMLRecord()
         else:
+            self.cfg_path = cfg_path
+
+        if self.cfg_path is not None:
             with open(self.cfg_path, "r") as cfg:
                 cfg_dict = yaml.load(cfg)
 
@@ -677,19 +690,23 @@ def kickstart(yaml_path=None):
 
     :return:
     """
+    # Create the CLIConfigurator first, because it may override defaults (eg, it can override the
+    # default location of pylarion_path or exporter_config, which are needed by PylarionConfigurator
+    # and YAMLConfigurator)
+
+    cli_cfg = CLIConfigurator()
     start_map = pyr.m()
-    pyl_cfg = PylarionConfigurator()
+    init_map = cli_cfg(start_map)
+    pyl_path = init_map.get("pylarion_path")
+    yaml_path = init_map.get("exporter_config")
+
+    pyl_cfg = PylarionConfigurator(path=pyl_path)
     env_cfg = OSEnvironmentConfigurator()
     yml_cfg = YAMLConfigurator(cfg_path=yaml_path)
     cli_cfg = CLIConfigurator()
 
-    pipeline = compose(cli_cfg, yml_cfg, env_cfg, pyl_cfg)
-    end_map = pipeline(start_map)
-
-    log.debug("====================end_map====================")
-    dprint(end_map)
-
-    final = CLIConfigRecord(**end_map)
+    pipeline = compose(finalize, cli_cfg, yml_cfg, env_cfg, pyl_cfg)
+    final = pipeline(start_map)
 
     log.debug("================= final ====================")
     dprint(final)

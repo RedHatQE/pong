@@ -124,13 +124,13 @@ class Exporter(object):
             else:
                 raise Exception("Could not create a new TestRun")
             test_run.status = "inprogress"
-            log.info("Creating test run for {}".format(s))
 
-            tr._set_custom_field("arch", self.transformer.config.distro.arch)
-            tr._set_custom_field("variant", self.transformer.config.distro.variant)
+            test_run._set_custom_field("arch", self.transformer.config.distro.arch)
+            test_run._set_custom_field("variant", self.transformer.config.distro.variant)
             for tc in testngs:
                 tc.create_test_record(test_run, run_by=runner)
 
+            log.info("Created test run for {}".format(s))
             test_run.status = "finished"
 
     def update_test_run(self, test_run, runner="stoner"):
