@@ -1,23 +1,22 @@
 ---
 
-pylarion_path: "~/.pylarion"
-user: ""
-password: ""
-result_path: ""
-project_id: ""
-testrun_template: ""
-testrun_prefix: ""
-testrun_suffix: ""
-suite_name: ""
-update_run: ""
-req_prefix:
+pylarion_path:          # path to .pylarion file to use (will replace contents of ~/.pylarion if given)
+user:                   # user for the .pylarion file
+password:               # password for user in the .pylarion file
+result_path:            # Path to a testng-results.xml file to parse
+project_id: RHEL6       # The Polarion project ID to run under
+testrun:
+  template:             # the polarion template id to use
+  prefix: RHSM          # Used to help determine testrun ID: "{} {} {}".format(prefix, base, suffix) (usually team name)
+  base:                 # see above.  This will often be determined by the <suite> name
+  suffix:               # See above.  This can be some other identifier, like a compose id
 distro:
-    arch: "x86_64"
-    variant: None
-    name: None
-    major: None
-    minor: None
+  arch: x86_64          # arch to use as default
+  variant: Server       # variant to use as a default
+  major:                # the distro major number
+  minor:                # the distro minor numer
+  name:                 # a full distro name
 base_queries:
-    - ""
-environment_file: ""
-jenkins_url: ""
+  - rhsm.*.tests*       # sequence of TestCase title queries which will be performed and cached
+environment_file:       # path to a jenkins generated environment file (local path)
+build_url:              # If given, will replace result_path.  Where jenkins will store testng-results.xml artifact

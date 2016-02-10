@@ -4,4 +4,4 @@
 *.xml
 *.xsd
 build/
-docs/_build
+polarion_testng/docs/_build/

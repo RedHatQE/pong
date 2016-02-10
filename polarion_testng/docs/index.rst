@@ -12,6 +12,10 @@ Contents:
    :maxdepth: 2
 
    introduction
+   jenkins
+   setup
+   configuration
+   commandline
 
 .. toctree::
    :maxdepth: 2
