@@ -1,10 +1,10 @@
-from polarion_testng.utils import *
+from pong.utils import *
 from pylarion.work_item import TestSteps as PylTestSteps
 from pylarion.work_item import TestStep as PylTestStep
 
-from polarion_testng.logger import log
+from pong.logger import log
 import datetime
-from polarion_testng.decorators import profile
+from pong.decorators import profile
 
 
 class TestIterationResult(object):
@@ -174,7 +174,7 @@ class TestNGToPolarion(object):
     @profile
     def create_polarion_tc(self):
         """
-        Given the polarion_testng.TestCase, convert it to the equivalent pylarion.work_item.TestCase
+        Given the pong.TestCase, convert it to the equivalent pylarion.work_item.TestCase
         """
         t = lambda x: unicode.encode(x, encoding="utf-8", errors="ignore") if isinstance(x, unicode) else x
         desc, title = [t(x) for x in [self.description, self.title]]

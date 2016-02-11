@@ -1,6 +1,6 @@
 (import [argparse [ArgumentParser]]
-        [polarion_testng.utils [*]]
-        [polarion_testng.logger [log]]
+        [pong.utils [*]]
+        [pong.logger [log]]
         [shutil])
 
 ;; If we ever get to python3 support

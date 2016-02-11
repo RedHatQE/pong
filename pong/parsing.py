@@ -2,15 +2,14 @@ import xml.etree.ElementTree as ET
 from urllib2 import urlopen
 from urlparse import urlparse
 
-from polarion_testng.core import TestIterationResult, TestNGToPolarion
-from polarion_testng.decorators import fixme
-from polarion_testng.logger import log
-from polarion_testng.utils import *
+from pong.core import TestIterationResult, TestNGToPolarion
+from pong.decorators import fixme
+from pong.logger import log
+from pong.utils import *
 
 import hy
-import polarion_testng.requirement as preq
-from polarion_testng.decorators import profile
-from pyrsistent import PRecord, field
+import pong.requirement as preq
+from pong.decorators import profile
 
 
 def get_data_provider_elements(elem):
@@ -112,7 +111,7 @@ def add_step(steps, title, attrs, new_row, exception=None, output=None,
 @fixme("parsing needs to change how it gets TestSteps (data providers are not TestStep based anymore)")
 def parse_results(result_path, get_output=False):
     """
-    This is the main function which parses the polarion_testng-results.xml file and creates a dictionary of
+    This is the main function which parses the pong-results.xml file and creates a dictionary of
     test case title -> list of {attributes (result of testmethod) and args (the arguments for this step)}
 
     :param result_path:

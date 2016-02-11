@@ -9,7 +9,7 @@ from pylarion.work_item import TestCase as PylTestCase
 from pylarion.work_item import Requirement
 from pylarion.test_run import TestRun
 
-from polarion_testng.decorators import retry, profile
+from pong.decorators import retry, profile
 
 PYLARION_CONFIG = [os.path.join(os.environ['HOME'], ".pylarion")]
 PASS = "PASS"
@@ -18,7 +18,7 @@ SKIP = "SKIP"
 STATUS_MAP = {"PASS": PASS, "FAIL": FAIL, "SKIP": SKIP}
 DEFAULT_WORKSPACE = "/home/jenkins/workspace"
 DEFAULT_JENKINS_PROJECT = "stoner_gui_test_polarion"
-DEFAULT_RESULT_PATH = "test_output/polarion_testng-results.xml"
+DEFAULT_RESULT_PATH = "test_output/pong-results.xml"
 TEST_REQUIREMENT_PREFIX = "RHSM "  # prefix to add to auto generated Requirement title
 
 TC_KEYS = {"caseimportance": "high", "caselevel": "component", "caseposneg": "positive",

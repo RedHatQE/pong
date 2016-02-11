@@ -1,4 +1,4 @@
-import polarion_testng.configuration as cfg
+import pong.configuration as cfg
 import pyrsistent as pyr
 
 import unittest

@@ -17,13 +17,13 @@ Parses a testng-results.xml file and
 """
 import sys
 import hy
-import polarion_testng.cli as cli
+import pong.cli as cli
 
-from polarion_testng.logger import log
-from polarion_testng.utils import *
-from polarion_testng.decorators import retry, profile
-from polarion_testng.parsing import Transformer
-from polarion_testng.configuration import kickstart
+from pong.logger import log
+from pong.utils import *
+from pong.decorators import retry, profile
+from pong.parsing import Transformer
+from pong.configuration import kickstart
 
 OLD_EXPORTER = 0
 TESTING = 0

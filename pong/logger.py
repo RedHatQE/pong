@@ -2,7 +2,7 @@ import logging
 import sys
 import time
 
-DEFAULT_LOG_FILE = "/tmp/polarion_testng"
+DEFAULT_LOG_FILE = "/tmp/pong"
 
 
 def make_timestamp():

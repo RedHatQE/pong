@@ -22,7 +22,7 @@ import os
 sys.path.insert(0, os.path.abspath('../..'))
 print("================\nsys.path is", sys.path)
 
-import polarion_testng
+import pong
 
 # -- General configuration ------------------------------------------------
 

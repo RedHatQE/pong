@@ -1,7 +1,7 @@
 ;; Module to create a Polarion Requirement and link it to a TestCase
 
-(import [polarion-testng.core [TestNGToPolarion]]
-        [polarion-testng.utils [*]]
+(import [pong.core [TestNGToPolarion]]
+        [pong.utils [*]]
         [re]
         [pyrsistent [m v s pvector PRecord field]]
         [pylarion.work_item [Requirement]])

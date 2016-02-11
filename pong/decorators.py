@@ -3,7 +3,7 @@ import ssl
 import platform
 import types
 from functools import wraps
-from polarion_testng.logger import log
+from pong.logger import log
 
 version = [int(i) for i in platform.python_version_tuple()]
 if version >= [2, 7, 7]:

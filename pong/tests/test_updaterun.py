@@ -1,5 +1,5 @@
-from polarion_testng.exporter import Exporter
-from polarion_testng.exporter import get_test_run
+from pong.exporter import Exporter
+from pong.exporter import get_test_run
 import ssl
 import argparse
 
@@ -7,8 +7,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--project", help="Project ID",
                     default="RedHatEnterpriseLinux7")
 parser.add_argument("--test-run-id", help="Unique ID of a Test Run")
-parser.add_argument("--polarion_testng-path", help="Path to polarion_testng-results.xml file",
-                    default="../../polarion_testng-results.xml")
+parser.add_argument("--pong-path", help="Path to pong-results.xml file",
+                    default="../../pong-results.xml")
 
 args = parser.parse_args()
 

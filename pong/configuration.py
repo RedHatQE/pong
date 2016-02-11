@@ -19,14 +19,15 @@ any errors will be more difficult.
 """
 
 from argparse import ArgumentParser
-from polarion_testng.utils import *
-from polarion_testng.logger import log
+from pong.utils import *
+from pong.logger import log
 import shutil
 import os
-import sys
+import logging
+
 import yaml
 from collections import Sequence
-import toolz
+
 from toolz.functoolz import partial, compose
 from pyrsistent import PRecord, field
 import pyrsistent as pyr
@@ -37,6 +38,9 @@ try:
     import configparser
 except ImportError as e:
     import ConfigParser as configparser
+
+
+DEFAULT_LOG_LEVEL = logging.DEBUG
 
 
 def fieldm():
@@ -299,7 +303,7 @@ class JenkinsConfigurator(Configurator):
     def __call__(self, omap):
         self.original_map = omap
         updated = omap.update(self.jenkins_record)
-        log.debug("=================== {} ====================".format(self.__class__))
+        log.log(DEFAULT_LOG_LEVEL, "=================== {} ====================".format(self.__class__))
         dprint(updated)
         return updated
 
@@ -322,7 +326,7 @@ class OSEnvironmentConfigurator(Configurator):
     def __call__(self, config_map):
         self.original_map = config_map
         updated = config_map.update(self._make_record())
-        log.debug("=================== {} ====================".format(self.__class__))
+        log.log("=================== {} ====================".format(self.__class__))
         dprint(updated)
         return updated
 
@@ -352,14 +356,14 @@ class CLIConfigRecord(PRecord):
     distro = add_field("-d", "--distro",
                        invariant=validate("distro is a Distro type", valid_distro),
                        type=Distro,
-                       help="Reads in the arch, variant, name, major and minor in the form of a json dict"
-                            "eg {'arch': 'x86_64', 'variant': 'Server', 'name': RedHatEnterpriseLinux-6.8',"
-                            "'major': 6, 'minor': 8}.  If used, must supply arch and variant")
+                       help="Reads in the arch, variant, name, major and minor in the following form: "
+                            " 'arch:x86_64,variant:Server,name:RedHatEnterpriseLinux-6.8,major:6,minor:8'"
+                            " If used, must supply arch and variant")
     artifact_archive = add_field("-a", "--artifact-archive",
                                  default="test-output/testng-results.xml",
                                  help="Used when run from a jenkins job, the jenkins job should use the Post-build"
-                                      "Actions -> Archive the artifacts -> Files to archive, and the value"
-                                      "entered there for the testng-result.xml should be entered here")
+                                      " Actions -> Archive the artifacts -> Files to archive, and the value"
+                                      " entered there for the testng-result.xml should be entered here")
     result_path = add_field("-r", "--result-path", type=str,
                             invariant=lambda x: ((x is not None, "result_path is not None"),
                                                  (x.strip() != "", "result_path is not empty string")),
@@ -389,8 +393,8 @@ class CLIConfigRecord(PRecord):
     testrun_prefix = add_field("--testrun-prefix",
                                mandatory=True,
                                invariant=validate("testrun_prefix is not empty string", non_empty_string),
-                               help="The testrun id is generated as: "
-                                    "'{} {} {} {}'.format(prefix, suffix, suite, unique")
+                               help="Part of the testrun id.  The testrun id is generated as: "
+                                    "'{} {} {} {}'.format(prefix, base, suffix, unique")
     testrun_suffix = add_field("--testrun-suffix",
                                help="See testrun_prefix",
                                default="")
@@ -412,7 +416,7 @@ class CLIConfigRecord(PRecord):
     update_run = add_field("--update-run", default=False,
                            help="If given, the arg will be used to find and update an existing "
                                                 "Polarion TestRun with the testng-results.xml")
-    set_project = add_field("--set-project", default=False,
+    set_project = add_field("--write-to-project", default=False, dest="set_project",
                             help="If project_id, user, or password are given, write to the pylarion_path")
     query_testcase = add_field("--query-testcase", default=False,
                                help="Find a testcase by title, and print out information")
@@ -466,7 +470,7 @@ class CLIConfigurator(Configurator):
 
     def __call__(self, omap):
         self.original_map = omap
-        log.debug("------------------- BEFORE: {} -----------------------".format(self.__class__))
+        log.log(DEFAULT_LOG_LEVEL, "------------------- BEFORE: {} -----------------------".format(self.__class__))
         dprint(omap)
 
         distro_record = self._make_distro_record()
@@ -487,6 +491,8 @@ class CLIConfigurator(Configurator):
             artifact = newmap["result_path"] + art_path
         except KeyError:
             artifact = self.args.result_path
+            if artifact is None:
+                raise Exception("Must specify either -r or -e option")
             if artifact.startswith("http"):
                 artifact += art_path
         self.dict_args["result_path"] = artifact
@@ -494,7 +500,7 @@ class CLIConfigurator(Configurator):
         # Trim any args from self.dict_args that are None
         final_args = {k: v for k, v in self.dict_args.items() if v is not None}
         updated = newmap.update(final_args)
-        log.debug("=================== {} ====================".format(self.__class__))
+        log.log(DEFAULT_LOG_LEVEL, "=================== {} ====================".format(self.__class__))
         dprint(updated)
         return updated
 
@@ -582,7 +588,7 @@ class YAMLConfigurator(Configurator):
         """
         self.original_map = omap
         updated = omap.update(self.record)
-        log.debug("=================== {} ====================".format(self.__class__))
+        log.log(DEFAULT_LOG_LEVEL, "=================== {} ====================".format(self.__class__))
         dprint(updated)
         return updated
 
@@ -607,7 +613,7 @@ class PylarionConfigurator(Configurator):
     def __call__(self, omap):
         self.original_map = omap
         updated = omap.update(self.pylarion_record)
-        log.debug("=================== {} ====================".format(self.__class__))
+        log.debug(DEFAULT_LOG_LEVEL, "=================== {} ====================".format(self.__class__))
         dprint(updated)
         return updated
 
@@ -682,7 +688,7 @@ def create_backup(orig, backup=None):
 
 def dprint(m):
     for k, v in m.items():
-        log.debug("{}={}".format(k, v))
+        log.log(DEFAULT_LOG_LEVEL, "{}={}".format(k, v))
 
 
 def kickstart(yaml_path=None):
@@ -709,11 +715,11 @@ def kickstart(yaml_path=None):
     pipeline = compose(cli_cfg, yml_cfg, env_cfg, pyl_cfg)
     end_map = pipeline(start_map)
 
-    log.debug("================ end_map ===================")
+    log.log(DEFAULT_LOG_LEVEL, "================ end_map ===================")
     dprint(end_map)
 
     final = ConfigRecord(**end_map)
-    log.debug("================= final ====================")
+    log.log(DEFAULT_LOG_LEVEL, "================= final ====================")
     dprint(final)
 
     result = {"pyl_cfg": pyl_cfg,
@@ -726,3 +732,4 @@ def kickstart(yaml_path=None):
 
 if __name__ == "__main__":
     result = kickstart()
+    print result
