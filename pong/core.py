@@ -68,7 +68,7 @@ class TestNGToPolarion(object):
         """
         if self._status is None:
             result = self.attributes["status"]
-            if any(filter(lambda ti: ti.status != "PASS" or ti.status != "SKIP", self.step_results)):
+            if any(filter(lambda ti: ti.status != "PASS" and ti.status != "SKIP", self.step_results)):
                 result = FAIL
             self._status = result
         return self._status
@@ -207,8 +207,6 @@ class TestNGToPolarion(object):
             if self.step_results:
                 step = self.make_polarion_test_step()
                 tc.set_test_steps([step])
-            else:
-                raise Exception("No step result in TestNGToPolarion")
 
         if not tc:
             raise Exception("Could not create TestCase for {}".format(self.title))

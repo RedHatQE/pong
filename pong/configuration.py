@@ -23,6 +23,7 @@ from pong.utils import *
 from pong.logger import log
 import shutil
 import os
+import sys
 import logging
 
 import yaml
@@ -40,7 +41,7 @@ except ImportError as e:
     import ConfigParser as configparser
 
 
-DEFAULT_LOG_LEVEL = logging.DEBUG
+DEFAULT_LOG_LEVEL = logging.INFO
 
 
 def fieldm():
@@ -326,7 +327,7 @@ class OSEnvironmentConfigurator(Configurator):
     def __call__(self, config_map):
         self.original_map = config_map
         updated = config_map.update(self._make_record())
-        log.log("=================== {} ====================".format(self.__class__))
+        log.log(DEFAULT_LOG_LEVEL, "=================== {} ====================".format(self.__class__))
         dprint(updated)
         return updated
 
@@ -718,9 +719,19 @@ def kickstart(yaml_path=None):
     log.log(DEFAULT_LOG_LEVEL, "================ end_map ===================")
     dprint(end_map)
 
-    final = ConfigRecord(**end_map)
+    try:
+        final = ConfigRecord(**end_map)
+    except pyr._checked_types.InvariantException as ex:
+        print ex
+        if ex.missing_fields:
+            log.error("Following fields not configureD: " + str(ex.missing_fields))
+        if False and  ex.invariant_errors:
+            log.error("Invariants broken: " + str(ex.invariant_errors))
+        log.error("Please correct the above and run again")
+        sys.exit(1)
     log.log(DEFAULT_LOG_LEVEL, "================= final ====================")
     dprint(final)
+    log.log(DEFAULT_LOG_LEVEL, "============================================\n")
 
     result = {"pyl_cfg": pyl_cfg,
               "env_cfg": env_cfg,
