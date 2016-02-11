@@ -228,7 +228,7 @@ class ConfigRecord(PRecord):
     """
     distro = field(mandatory=True, type=Distro)
     artifact_archive = field()
-    result_path = field()
+    result_path = fieldm()
     project_id = fieldm()
     pylarion_path = fieldm()
     pylarion_user = field()
@@ -397,8 +397,7 @@ class CLIConfigRecord(PRecord):
                                help="Part of the testrun id.  The testrun id is generated as: "
                                     "'{} {} {} {}'.format(prefix, base, suffix, unique")
     testrun_suffix = add_field("--testrun-suffix",
-                               help="See testrun_prefix",
-                               default="")
+                               help="See testrun_prefix")
     testrun_base = add_field("--testrun-base",
                              help="See testrun_prefix.  Defaults to the <suite name=> from the testng-results.xml")
     base_queries = add_field("-b", "--base-queries",
@@ -479,28 +478,21 @@ class CLIConfigurator(Configurator):
             self.dict_args["distro"] = distro_record
 
         # Before we modify the map, let's see if an environment file was passed in
-        newmap = self.original_map
-        if self.jnk_cfg:
-            newmap = self.jnk_cfg(omap)
-        if self.args.environment_file:
-            jenkins_cfg = JenkinsConfigurator(self.args.environment_file)
-            newmap = jenkins_cfg(omap)
-
         art_path = "artifact/{}".format(self.args.artifact_archive)
-        # result_path has to come either from -r or -e
-        try:
-            artifact = newmap["result_path"] + art_path
-        except KeyError:
-            artifact = self.args.result_path
-            if artifact is None:
-                raise Exception("Must specify either -r or -e option")
-            if artifact.startswith("http"):
+        if self.args.environment_file is not None:
+            if "result_path" in omap:
+                artifact = omap["result_path"] + art_path
+            else:
+                artifact = ""
+        else:
+            artifact = self.dict_args["result_path"]
+            if isinstance(artifact, str) and artifact.startswith("http"):
                 artifact += art_path
         self.dict_args["result_path"] = artifact
 
         # Trim any args from self.dict_args that are None
         final_args = {k: v for k, v in self.dict_args.items() if v is not None}
-        updated = newmap.update(final_args)
+        updated = omap.update(final_args)
         log.log(DEFAULT_LOG_LEVEL, "=================== {} ====================".format(self.__class__))
         dprint(updated)
         return updated
@@ -614,7 +606,7 @@ class PylarionConfigurator(Configurator):
     def __call__(self, omap):
         self.original_map = omap
         updated = omap.update(self.pylarion_record)
-        log.debug(DEFAULT_LOG_LEVEL, "=================== {} ====================".format(self.__class__))
+        log.log(DEFAULT_LOG_LEVEL, "=================== {} ====================".format(self.__class__))
         dprint(updated)
         return updated
 
@@ -707,13 +699,20 @@ def kickstart(yaml_path=None):
     init_map = cli_cfg(start_map)
     pyl_path = init_map.get("pylarion_path")
     yaml_path = init_map.get("exporter_config")
+    env_path = init_map.get("environment_file")
 
     pyl_cfg = PylarionConfigurator(path=pyl_path)
     env_cfg = OSEnvironmentConfigurator()
     yml_cfg = YAMLConfigurator(cfg_path=yaml_path)
+    jnk_cfg = None
+    if env_path:
+        jnk_cfg = JenkinsConfigurator(env_path)
     cli_cfg = CLIConfigurator()
 
-    pipeline = compose(cli_cfg, yml_cfg, env_cfg, pyl_cfg)
+    if env_path:
+        pipeline = compose(cli_cfg, jnk_cfg, yml_cfg, env_cfg, pyl_cfg)
+    else:
+        pipeline = compose(cli_cfg, yml_cfg, env_cfg, pyl_cfg)
     end_map = pipeline(start_map)
 
     log.log(DEFAULT_LOG_LEVEL, "================ end_map ===================")
@@ -724,7 +723,7 @@ def kickstart(yaml_path=None):
     except pyr._checked_types.InvariantException as ex:
         print ex
         if ex.missing_fields:
-            log.error("Following fields not configureD: " + str(ex.missing_fields))
+            log.error("Following fields not configured: " + str(ex.missing_fields))
         if False and  ex.invariant_errors:
             log.error("Invariants broken: " + str(ex.invariant_errors))
         log.error("Please correct the above and run again")
@@ -743,4 +742,5 @@ def kickstart(yaml_path=None):
 
 if __name__ == "__main__":
     result = kickstart()
-    print result
+    from pprint import pprint
+    pprint(result)
