@@ -488,7 +488,8 @@ class CLIConfigurator(Configurator):
         else:
             artifact = self.dict_args["result_path"]
             if isinstance(artifact, str) and artifact.startswith("http"):
-                artifact += art_path
+                if art_path not in artifact:
+                    artifact += art_path
         self.dict_args["result_path"] = artifact
 
         # Trim any args from self.dict_args that are None
