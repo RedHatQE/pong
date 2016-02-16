@@ -785,7 +785,7 @@ def cli_print(cfg_map):
         if name == "distro":
             if isinstance(val, str):
                 inside = re.compile(r"\((.+)\)").search(val).groups()[0]
-                d = {k: v for k, v in map(lambda x: x.split("="), inside.split(","))}
+                d = {k.strip(): v.replace("'", "") for k, v in map(lambda x: x.split("="), inside.split(","))}
 
                 val = Distro(**d)
 
@@ -799,6 +799,10 @@ def cli_print(cfg_map):
             return fmt("user", val)
         elif name == "pylarion_password":
             return fmt("password", val)
+        elif name == "base_queries":
+            v = val.replace("['", "")
+            v2 = v.replace("']", "")
+            return fmt(name, v2)
         else:
             return fmt(name, val)
 

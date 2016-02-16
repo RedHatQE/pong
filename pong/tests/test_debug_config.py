@@ -4,7 +4,7 @@ from pong.configuration import extractor, cli_print
 
 class Config(unittest.TestCase):
     def test_cli_print(self):
-        example = """1455653630.7-pong.logger-INFO: 	result_path=http://rhsm-jenkins.rhev-ci-vms.eng.rdu2.redhat.com/job/jsefler-subscription-manager-rhel-6.8-x86_64-Tier3Tests/23/artifact/test-output/testng-results.xml
+        example = """1455653630.7-pong.logger-INFO: 	result_path=http://my-jenkins.comjob/jsefler-subscription-manager-rhel-6.8-x86_64-Tier3Tests/23/artifact/test-output/testng-results.xml
 1455653630.7-pong.logger-INFO: 	query_testcase=False
 1455653630.7-pong.logger-INFO: 	get_default_project_id=False
 1455653630.7-pong.logger-INFO: 	pylarion_path=/home/jenkins/.pylarion
