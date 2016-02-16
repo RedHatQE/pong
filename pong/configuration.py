@@ -519,6 +519,22 @@ class CLIConfigurator(Configurator):
             if self.args.set_project:
                 self.reset_project_id = True
 
+    @staticmethod
+    def set_project_id(pylarion_path, project_id, backup=".bak"):
+        """
+        Writes the project_id to the pylarion file
+
+        :param pylarion_path:
+        :param project_id:
+        :param backup:
+        :return:
+        """
+        create_backup(pylarion_path, backup=backup)
+        cparser = PylarionConfigurator.create_cfg_parser(path=pylarion_path)
+        with open(pylarion_path, "w") as newpy:
+            cparser.set("webservice", "default_project", project_id)
+            cparser.write(newpy)
+
 
 class YAMLRecord(PRecord):
     """Keys in the YAML config file that we care about"""
@@ -617,6 +633,23 @@ class PylarionConfigurator(Configurator):
         log.debug(DEFAULT_LOG_LEVEL, "=================== {} ====================".format(self.__class__))
         dprint(updated)
         return updated
+
+    @staticmethod
+    def create_cfg_parser(path=None):
+        """
+        Creates a config parser to read in the .pylarion file
+
+        :param path:
+        :return:
+        """
+        if path is None:
+            path = os.path.expanduser("~/.pylarion")
+        cparser = configparser.ConfigParser()
+        if not os.path.exists(path):
+            raise Exception("{} does not exist".format(path))
+        with open(path) as fp:
+            cfg = cparser.readfp(fp)
+            return cfg
 
 
 def finalize(pipelined_map):
