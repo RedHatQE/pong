@@ -21,7 +21,7 @@ from pong.logger import log
 from pong.utils import *
 from pong.decorators import retry, profile
 from pong.parsing import Transformer
-from pong.configuration import kickstart, CLIConfigurator
+from pong.configuration import kickstart, CLIConfigurator, cli_print
 
 OLD_EXPORTER = 0
 TESTING = 0
@@ -198,6 +198,9 @@ class Exporter(object):
         """
         if result is None:
             result = kickstart()
+
+        translate_to_cli = cli_print(result["config"])
+        log.info("Calling equivalent: python -m pong.exporter {}".format(translate_to_cli))
 
         cli_cfg = result["cli_cfg"]
         args = cli_cfg.args

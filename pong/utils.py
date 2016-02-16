@@ -194,7 +194,7 @@ def make_test_run_id_from_latest(test_run):
     :param test_run: TestRun object
     :return: str
     """
-    patt = re.compile(r"([a-zA-Z\-_: ]+)(\d+)$")
+    patt = re.compile(r"^(.+)\s+(\d+)$")
     m = patt.search(test_run.test_run_id)
     base_id = test_run.test_run_id
     if m:
