@@ -406,9 +406,10 @@ class CLIConfigRecord(PRecord):
                              invariant=lambda x: ((x is not None, "base_queries is not None"),
                                                   (is_sequence(x), "base_queries is a sequence"),
                                                   (sequence_vals_truthy(x), "base_queries values are truthy")),
-                             help="A sequence of strings that will be used for lucene based TestCase title searches "
-                                  "For example, if all your test cases have rhel-middleware-functional|regression"
-                                  " in them, then do: 'rhel-middleware*')")
+                             help="A list of space separated strings that will be used for lucene based TestCase title "
+                                  "searches For example, if all your test cases have rhel-<6|7>-test "
+                                  " in them, then do: '-b rhel-6-test rhel-7-test'.  Another way to do this is like"
+                                  " -b 'rhel-*-test'")
     environment_file = add_field("-e", "--environment-file",
                                  help="Path to an upstream jenkins job generated file.  This file will override"
                                       "the results_path even on the CLI")
@@ -777,23 +778,16 @@ def kickstart(yaml_path=None):
 
 
 def cli_print(cfg_map):
-    def make_pattern(T):
-        patt = r"{}=(\w+)".format(T)
-        return re.compile(patt)
-
     def cli_ize(name, val):
         fmt = lambda n, f: "--{}='{}'".format(n.replace("_", "-"), f)
 
         distro = []
         if name == "distro":
             if isinstance(val, str):
-                arch = make_pattern("arch").search(val)
-                variant = make_pattern("variant").search(val)
-                major = make_pattern("major").search(val)
-                minor = make_pattern("minor").search(val)
-                dname = make_pattern("name").search(val)
+                inside = re.compile(r"\((.+)\)").search(val).groups()[0]
+                d = {k: v for k, v in map(lambda x: x.split("="), inside.split(","))}
 
-                val = Distro(arch=arch, variant=variant, major=major, minor=minor, name=name)
+                val = Distro(**d)
 
             distro.append("arch:{}".format(val.arch))
             distro.append("variant:{}".format(val.variant))

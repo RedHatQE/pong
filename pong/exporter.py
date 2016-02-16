@@ -42,6 +42,10 @@ class Exporter(object):
         self.collect()
 
     def collect(self):
+        """
+
+        :return:
+        """
         testng_suites = self.transformer.parse_suite()
         self.tests = testng_suites
 
@@ -69,8 +73,6 @@ class Exporter(object):
             for tc in tests:
                 if tc.polarion_tc is None:
                     log.info("WTF.  {} has tc.polarion_tc is None".format(tc.title))
-
-        print self.tests
 
     @property
     def project(self):

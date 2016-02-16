@@ -202,7 +202,7 @@ def make_test_run_id_from_latest(test_run):
         id = int(m.groups()[1]) + 1
     else:
         id = 1
-    return "{}{}".format(base_id, id)
+    return "{} {}".format(base_id, id)
 
 
 def convert_status(testng_result):
