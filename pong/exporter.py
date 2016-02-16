@@ -16,14 +16,12 @@ Parses a testng-results.xml file and
 
 """
 import sys
-import hy
-import pong.cli as cli
 
 from pong.logger import log
 from pong.utils import *
 from pong.decorators import retry, profile
 from pong.parsing import Transformer
-from pong.configuration import kickstart
+from pong.configuration import kickstart, CLIConfigurator, cli_print
 
 OLD_EXPORTER = 0
 TESTING = 0
@@ -119,8 +117,10 @@ class Exporter(object):
                 try:
                     test_run = TestRun.create(self.project, new_id, template_id)
                     break
-                except:
+                except Exception as ex:
+                    log.warning("Got exception {}".format(ex))
                     retries -= 1
+                    log.warning("Retrying {} more times".format(retries))
             else:
                 raise Exception("Could not create a new TestRun")
             test_run.status = "inprogress"
@@ -199,6 +199,9 @@ class Exporter(object):
         if result is None:
             result = kickstart()
 
+        translate_to_cli = cli_print(result["config"])
+        log.info("Calling equivalent: python -m pong.exporter {}".format(translate_to_cli))
+
         cli_cfg = result["cli_cfg"]
         args = cli_cfg.args
         config = result["config"]
@@ -219,7 +222,7 @@ class Exporter(object):
             log.info(get_default_project())
         if args.set_project:
             reset_project_id = True
-            cli.set_project_id(config.pylarion_path, config.set_project)
+            CLIConfigurator.set_project_id(config.pylarion_path, config.set_project)
         if args.get_latest_testrun:
             tr = get_latest_test_run(args.get_latest_testrun)
             for k, v in make_iterable(tr):
@@ -231,7 +234,7 @@ class Exporter(object):
         # Get the project_id.  If the passed in value is different, we need to edit the .pylarion file
         default_project_id = cli_cfg.original_project_id
         if config.project_id != default_project_id:
-            cli.set_project_id(using_pylarion_path, config.project_id)
+            CLIConfigurator.set_project_id(using_pylarion_path, config.project_id)
 
         default_queries = [] if args.base_queries is None else args.base_queries
         transformer = Transformer(config)
@@ -255,7 +258,7 @@ class Exporter(object):
                 backup = using_pylarion_path + ".bak"
                 shutil.move(backup, using_pylarion_path)
             except Exception as ex:
-                cli.set_project_id(using_pylarion_path, original_project_id)
+                CLIConfigurator.set_project_id(using_pylarion_path, original_project_id)
 
 
 if __name__ == "__main__":

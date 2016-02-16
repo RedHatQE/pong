@@ -406,8 +406,9 @@ class CLIConfigRecord(PRecord):
                              invariant=lambda x: ((x is not None, "base_queries is not None"),
                                                   (is_sequence(x), "base_queries is a sequence"),
                                                   (sequence_vals_truthy(x), "base_queries values are truthy")),
-                             help="A sequence of strings that will be used for TestCase title searches "
-                                  "eg 'title:<base_query>')")
+                             help="A sequence of strings that will be used for lucene based TestCase title searches "
+                                  "For example, if all your test cases have rhel-middleware-functional|regression"
+                                  " in them, then do: 'rhel-middleware*')")
     environment_file = add_field("-e", "--environment-file",
                                  help="Path to an upstream jenkins job generated file.  This file will override"
                                       "the results_path even on the CLI")
@@ -511,6 +512,22 @@ class CLIConfigurator(Configurator):
             if self.args.set_project:
                 self.reset_project_id = True
 
+    @staticmethod
+    def set_project_id(pylarion_path, project_id, backup=".bak"):
+        """
+        Writes the project_id to the pylarion file
+
+        :param pylarion_path:
+        :param project_id:
+        :param backup:
+        :return:
+        """
+        create_backup(pylarion_path, backup=backup)
+        cparser = PylarionConfigurator.create_cfg_parser(path=pylarion_path)
+        with open(pylarion_path, "w") as newpy:
+            cparser.set("webservice", "default_project", project_id)
+            cparser.write(newpy)
+
 
 class YAMLRecord(PRecord):
     """Keys in the YAML config file that we care about"""
@@ -610,6 +627,23 @@ class PylarionConfigurator(Configurator):
         dprint(updated)
         return updated
 
+    @staticmethod
+    def create_cfg_parser(path=None):
+        """
+        Creates a config parser to read in the .pylarion file
+
+        :param path:
+        :return:
+        """
+        if path is None:
+            path = os.path.expanduser("~/.pylarion")
+        cparser = configparser.ConfigParser()
+        if not os.path.exists(path):
+            raise Exception("{} does not exist".format(path))
+        with open(path) as fp:
+            cfg = cparser.readfp(fp)
+            return cfg
+
 
 def finalize(pipelined_map):
     return ConfigRecord(**pipelined_map)
@@ -681,7 +715,8 @@ def create_backup(orig, backup=None):
 
 def dprint(m):
     for k, v in m.items():
-        log.log(DEFAULT_LOG_LEVEL, "{}={}".format(k, v))
+        kv = "{}={}".format(str(k), str(v))
+        log.log(DEFAULT_LOG_LEVEL, kv)
 
 
 def kickstart(yaml_path=None):
@@ -738,6 +773,76 @@ def kickstart(yaml_path=None):
               "cli_cfg": cli_cfg,
               "config": final}
     return result
+
+
+def cli_print(cfg_map):
+    def make_pattern(T):
+        patt = r"{}=(\w+)".format(T)
+        return re.compile(patt)
+
+    def cli_ize(name, val):
+        fmt = lambda n, f: "--{}='{}'".format(n.replace("_", "-"), f)
+
+        distro = []
+        if name == "distro":
+            if isinstance(val, str):
+                arch = make_pattern("arch").search(val)
+                variant = make_pattern("variant").search(val)
+                major = make_pattern("major").search(val)
+                minor = make_pattern("minor").search(val)
+                dname = make_pattern("name").search(val)
+
+                val = Distro(arch=arch, variant=variant, major=major, minor=minor, name=name)
+
+            distro.append("arch:{}".format(val.arch))
+            distro.append("variant:{}".format(val.variant))
+            for x in ["major", "minor", "name"]:
+                if x in val:
+                    distro.append("{}:{}".format(x, getattr(val, x)))
+            return fmt(name, ",".join(distro))
+        elif name == "pylarion_user":
+            return fmt("user", val)
+        elif name == "pylarion_password":
+            return fmt("password", val)
+        else:
+            return fmt(name, val)
+
+    return " ".join(cli_ize(k, v) for k, v in cfg_map.items())
+
+
+def extractor(text):
+    """
+    Takes a log text of the final, and converts it back into a dict.
+
+    for example:
+
+    1455641905.55-pong.logger-INFO: 	result_path=http://my-jenkins.com/job/some-job/23/artifact/test-output/testng-results.xml
+    1455641905.55-pong.logger-INFO: 	query_testcase=False
+    1455641905.55-pong.logger-INFO: 	get_default_project_id=False
+    1455641905.55-pong.logger-INFO: 	pylarion_path=/home/jenkins/.pylarion
+    1455641905.55-pong.logger-INFO: 	exporter_config=/home/jenkins/exporter.yml
+    1455641905.55-pong.logger-INFO: 	update_run=False
+    1455641905.55-pong.logger-INFO: 	testrun_prefix=RHSM
+    1455641905.55-pong.logger-INFO: 	testrun_template=RHSM RHEL6-8
+    1455641905.55-pong.logger-INFO: 	get_latest_testrun=False
+    1455641905.56-pong.logger-INFO: 	set_project=False
+    1455641905.56-pong.logger-INFO: 	base_queries=['rhsm.*.tests*']
+    1455641905.56-pong.logger-INFO: 	project_id=RHEL6
+    1455641905.56-pong.logger-INFO: 	generate_only=False
+    1455641905.56-pong.logger-INFO: 	testrun_suffix=Server x86_64 Run
+    1455641905.56-pong.logger-INFO: 	artifact_archive=test-output/testng-results.xml
+    1455641905.56-pong.logger-INFO: 	distro=Distro(major='6', arch='x86_64', variant='Server', name='Red Hat Enterprise Linux', minor='8')
+    :param text:
+    :return:
+    """
+    args = {}
+    patt = re.compile(r".*INFO:\s+(\w+)=(.*)")
+    for line in text.split("\n"):
+        m = patt.search(line)
+        if m:
+            k , v = m.groups()
+            args[k] = v
+    return args
 
 
 if __name__ == "__main__":

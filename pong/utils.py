@@ -1,7 +1,11 @@
+import shutil
+
 import re
 import os
 import ConfigParser
 from functools import partial
+from itertools import repeat
+
 
 from toolz import itertoolz as itz
 from toolz import functoolz as ftz
@@ -190,7 +194,7 @@ def make_test_run_id_from_latest(test_run):
     :param test_run: TestRun object
     :return: str
     """
-    patt = re.compile(r"([a-zA-Z\-_: ]+)(\d+)$")
+    patt = re.compile(r"^(.+)\s+(\d+)$")
     m = patt.search(test_run.test_run_id)
     base_id = test_run.test_run_id
     if m:
@@ -293,3 +297,31 @@ def make_iterable(obj):
     items = filter(valid, dir(obj))
     for i in items:
         yield i, getattr(obj, i)
+
+
+def replace(names_to_check, non_valid=None, rmap=None):
+    """
+    Removes characters defined in non_valid from strings defined in names_to_check
+
+    Does not mutate strings in names_to_check, but returns new strings with invalid
+    characters replaced by a single space
+
+    :param names_to_check: a list of names to sanitize
+    :param non_valid: a list or set of characters or strings which should be replaced
+    :param rmap: a mapping from non_valid char to replacement char.  Default is to
+                 replace any non_valid character with a single space
+    :return:
+    """
+    if non_valid is None:
+        non_valid = [c for c in """\/.:*"<>|~!@#$?%^&'*()+`,="""] + ['Tab']
+    if rmap is None:
+        rmap = {c: " " for c in non_valid}
+
+    def clean(n, nv):
+        return reduce(lambda n, c: n if c not in n else n.replace(c, rmap[c]), nv, n)
+    return map(clean, names_to_check, repeat(non_valid, len(names_to_check)))
+
+
+def create_backup(orig, backup=".bak"):
+    backup_path = orig + backup
+    shutil.copy(orig, backup_path)

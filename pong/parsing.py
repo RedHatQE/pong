@@ -7,7 +7,6 @@ from pong.decorators import fixme
 from pong.logger import log
 from pong.utils import *
 
-import hy
 import pong.requirement as preq
 from pong.decorators import profile
 
@@ -340,9 +339,15 @@ class Transformer(object):
         """
         Generates a name that can be used to look up testruns
 
+        This function also sanitizes these characters:
+        \/.:*"<>|~!@#$?%^&'*()+`,='Tab'
+
         :param suite_name:
         :return:
         """
+        check = [self.testrun_prefix, suite_name, self.testrun_suffix]
+        new = replace(check)
+        self.testrun_prefix, suite_name, self.testrun_suffix = new
         return "{} {} {}".format(self.testrun_prefix, suite_name, self.testrun_suffix)
 
     @property
