@@ -778,6 +778,12 @@ def kickstart(yaml_path=None):
 
 
 def cli_print(cfg_map):
+    """
+    Takes a configuration dict and returns a CLI friendly string
+
+    :param cfg_map:
+    :return:
+    """
     def cli_ize(name, val):
         fmt = lambda n, f: "--{}='{}'".format(n.replace("_", "-"), f)
 
