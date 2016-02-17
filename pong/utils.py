@@ -202,7 +202,18 @@ def make_test_run_id_from_latest(test_run):
         id = int(m.groups()[1]) + 1
     else:
         id = 1
-    return "{} {}".format(base_id, id)
+
+    base_id = remove_run(base_id)
+    return "{} Run {}".format(base_id, id)
+
+
+def remove_run(s):
+    s = s.strip()
+    if s.endswith("Run"):
+        s = s[:-3]
+        return remove_run(s)
+    else:
+        return s
 
 
 def convert_status(testng_result):
