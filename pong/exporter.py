@@ -201,8 +201,8 @@ class Exporter(object):
         if result is None:
             result = kickstart()
 
-        #translate_to_cli = cli_print(result["config"])
-        #log.info("Calling equivalent: python -m pong.exporter {}".format(translate_to_cli))
+        translate_to_cli = cli_print(result["config"])
+        log.info("Calling equivalent: python -m pong.exporter {}".format(translate_to_cli))
 
         cli_cfg = result["cli_cfg"]
         args = cli_cfg.args
