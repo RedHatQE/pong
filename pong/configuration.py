@@ -41,7 +41,7 @@ except ImportError as e:
     import ConfigParser as configparser
 
 
-DEFAULT_LOG_LEVEL = logging.INFO
+DEFAULT_LOG_LEVEL = logging.DEBUG
 
 
 def fieldm():
@@ -715,10 +715,10 @@ def create_backup(orig, backup=None):
     return shutil.copy(orig, backup_path)
 
 
-def dprint(m):
+def dprint(m, log_lvl=DEFAULT_LOG_LEVEL):
     for k, v in m.items():
         kv = "{}={}".format(str(k), str(v))
-        log.log(DEFAULT_LOG_LEVEL, kv)
+        log.log(log_lvl, kv)
 
 
 def kickstart(yaml_path=None):
@@ -765,9 +765,9 @@ def kickstart(yaml_path=None):
             log.error("Invariants broken: " + str(ex.invariant_errors))
         log.error("Please correct the above and run again")
         sys.exit(1)
-    log.log(DEFAULT_LOG_LEVEL, "================= final ====================")
-    dprint(final)
-    log.log(DEFAULT_LOG_LEVEL, "============================================\n")
+    log.log(logging.INFO, "================= final ====================")
+    dprint(final, log_lvl=logging.INFO)
+    log.log(logging.INFO, "============================================\n")
 
     result = {"pyl_cfg": pyl_cfg,
               "env_cfg": env_cfg,
@@ -806,9 +806,14 @@ def cli_print(cfg_map):
         elif name == "pylarion_password":
             return fmt("password", val)
         elif name == "base_queries":
-            v = val.replace("['", "")
-            v2 = v.replace("']", "")
-            return fmt(name, v2)
+            mapper = partial(map, lambda q: '"{}"'.format(q))
+            if isinstance(val, str):
+                v = val.replace("['", "")
+                v2 = v.replace("']", "")
+                all = " ".join(mapper(v2.split()))
+            else:
+                all = " ".join(mapper(val))
+            return "--base-queries " + all
         else:
             return fmt(name, val)
 
