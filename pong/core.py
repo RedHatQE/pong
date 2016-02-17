@@ -213,13 +213,20 @@ class TestNGToPolarion(object):
         else:
             self.polarion_tc = tc
 
+        # FIXME: This code section should probably be moved into its own function
         linked_items = tc.linked_work_items
         if not self.requirement:
             log.warning("No requirement exists for this test case")
         else:
-            if not any(filter(lambda x: x == self.requirement, [li.work_item_id for li in linked_items])):
+            duplicates = filter(lambda x: x == self.requirement, [li.work_item_id for li in linked_items])
+            if not any(duplicates):
                 log.info("Linking requirement {} to TestCase {}".format(self.requirement, tc.work_item_id))
                 tc.add_linked_item(self.requirement, "verifies")
+            else:
+                msg = "Found duplicate linked Requirements {} for TestCase {}.  Cleaning...."
+                log.warning(msg.format(itz.first(duplicates), tc.work_item_id))
+                for _ in range(len(duplicates) - 1):
+                    tc.remove_linked_item(self.requirement, "verifies")
         return tc
 
     def make_polarion_test_step(self):
