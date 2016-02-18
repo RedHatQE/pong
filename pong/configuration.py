@@ -582,7 +582,7 @@ class YAMLConfigurator(Configurator):
             # If distro in final, create a Distro record
             if "distro" in cfg_dict:
                 distro_dict = dict(zip(cfg_dict["distro"].keys(), cfg_dict["distro"].values()))
-                # distro_dict = {k: cfg_dict["distro"][k] for k in distro_keys}
+                # distro_dict = {k: v for k, v in cfg_dict["distro"].items()}
                 cfg_dict["distro"] = Distro(**distro_dict)
 
             # Some of the YAML records are nested dicts. so we need to convert them

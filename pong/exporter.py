@@ -112,7 +112,8 @@ class Exporter(object):
             if tr:
                 new_id = make_test_run_id_from_latest(tr)
             else:
-                new_id = test_run_base + " 1"
+                test_run_base = remove_run(test_run_base)
+                new_id = test_run_base + " Run 1"
             log.info("Creating new Test Run ID: {}".format(new_id))
             retries = 3
             while retries > 0:
@@ -127,8 +128,8 @@ class Exporter(object):
                 raise Exception("Could not create a new TestRun")
             test_run.status = "inprogress"
 
-            test_run._set_custom_field("arch", self.transformer.config.distro.arch)
-            test_run._set_custom_field("variant", self.transformer.config.distro.variant)
+            test_run.arch = self.transformer.config.distro.arch.replace("_", "")
+            test_run.variant = self.transformer.config.distro.variant.lower()
             for tc in testngs:
                 tc.create_test_record(test_run, run_by=runner)
 
