@@ -47,7 +47,7 @@ class TestNGToPolarion(object):
         """
         self.title = title
         self.attributes = attrs
-        self.description = "" if "description" not in attrs else attrs["description"]
+        self.description = u"" if "description" not in attrs else unicode(attrs["description"], encoding="utf8")
         self.polarion_tc = test_case
         self.data_provider = "data-provider" in attrs
         self.params = [] if params is None else params
