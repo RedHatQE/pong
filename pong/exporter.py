@@ -105,15 +105,17 @@ class Exporter(object):
         """
         for s, testngs in self.tests.items():
             if test_run_base is None:
-                test_run_base = self.transformer.generate_base_testrun_id(s)
+                base_name = self.transformer.generate_base_testrun_id(s)
+            else:
+                base_name = test_run_base
 
             # Find our latest run.  If it doesn't exist, we'll generate one
-            tr = get_latest_test_run(test_run_base)
+            tr = get_latest_test_run(base_name)
             if tr:
                 new_id = make_test_run_id_from_latest(tr)
             else:
-                test_run_base = remove_run(test_run_base)
-                new_id = test_run_base + " Run 1"
+                base_name = remove_run(base_name)
+                new_id = base_name + " Run 1"
             log.info("Creating new Test Run ID: {}".format(new_id))
             retries = 3
             while retries > 0:
