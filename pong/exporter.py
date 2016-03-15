@@ -50,7 +50,9 @@ class Exporter(object):
         self.tests = testng_suites
 
         for k, tests in testng_suites.items():
-            not_skipped = filter(lambda x: x.status != SKIP, tests)
+            not_skipped = tests
+            if self.transformer.config.test_case_skips:
+                not_skipped = filter(lambda x: x.status != SKIP, tests)
             # TODO: It would be nice to have show which Tests got skipped due to dependency on another
             # test that failed, or because of a BZ blocker
             if TESTING:
@@ -92,8 +94,20 @@ class Exporter(object):
     def _update_tc(self, test_case):
         test_case.update()
 
+    def get_runner(self, runner):
+        if runner is None:
+            if "pylarion_user" in self.transformer.config:
+                runner = self.transformer.config.pylarion_user
+            else:
+                pylarion_path = self.transformer.config.pylarion_path
+                with open(pylarion_path, "r") as pyl_cfg:
+                    cfg_parser = ConfigParser.ConfigParser()
+                    cfg_parser.read(pyl_cfg)
+                    runner = cfg_parser.get("webservice", "user")
+        return runner
+
     @profile
-    def create_test_run(self, template_id, test_run_base=None, runner="stoner"):
+    def create_test_run(self, template_id, test_run_base=None, runner=None):
         """
         Creates a new Polarion TestRun
 
@@ -103,6 +117,8 @@ class Exporter(object):
         :param runner: str of the user id (eg stoner, not "Sean Toner")
         :return: None
         """
+        runner = self.get_runner(runner)
+
         for s, testngs in self.tests.items():
             if test_run_base is None:
                 base_name = self.transformer.generate_base_testrun_id(s)
@@ -130,8 +146,10 @@ class Exporter(object):
                 raise Exception("Could not create a new TestRun")
             test_run.status = "inprogress"
 
-            test_run.arch = self.transformer.config.distro.arch.replace("_", "")
             test_run.variant = self.transformer.config.distro.variant.lower()
+            test_run.update()
+            test_run.arch = self.transformer.config.distro.arch
+
             for tc in testngs:
                 tc.create_test_record(test_run, run_by=runner)
 
