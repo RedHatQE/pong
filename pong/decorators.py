@@ -40,9 +40,9 @@ def profile(fn):
         start_time = datetime.datetime.now()
         result = fn(*args, **kwargs)
         end_time = datetime.datetime.now()
-        log.info("\tstart time: {}".format(start_time))
-        log.info("\tend time: {}".format(end_time))
-        log.info("\ttotal time: {}".format(end_time - start_time))
+        log.debug("\tstart time: {}".format(start_time))
+        log.debug("\tend time: {}".format(end_time))
+        log.debug("\ttotal time: {}".format(end_time - start_time))
         return result
     return inner
 

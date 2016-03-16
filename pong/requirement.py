@@ -1,8 +1,7 @@
-from pong.core import TestNGToPolarion
 from pong.utils import *
-from pyrsistent import m, v, s, pvector, PRecord, field
 from pylarion.work_item import Requirement
 from toolz import first
+from pong.logger import log
 
 
 def is_requirement_exists(title):
@@ -13,7 +12,11 @@ def is_requirement_exists(title):
         print "Checking", unicode(r.title)
         return title == unicode(r.title)
 
-    return first(filter(fltr, reqs))
+    try:
+        res = first(filter(fltr, reqs))
+    except StopIteration:
+        res = False
+    return res
 
 
 def is_in_requirements(title, requirements):
@@ -29,8 +32,11 @@ def is_in_requirements(title, requirements):
 
 def create_requirement(project_id, title, description="", reqtype="functional",
                        severity="should_have"):
-    if is_requirement_exists(title):
-        return True
+    req = is_requirement_exists(title)
+    if req:
+        log.info("Found existing Requirement {}".format(req.title))
+        return req
     else:
+        log.info("Creating a new Requirement: {}".format(title))
         return Requirement.create(project_id, title, description, severity=severity,
                                   reqtype=reqtype)

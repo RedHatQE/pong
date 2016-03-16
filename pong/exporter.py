@@ -99,11 +99,7 @@ class Exporter(object):
             if "pylarion_user" in self.transformer.config:
                 runner = self.transformer.config.pylarion_user
             else:
-                pylarion_path = self.transformer.config.pylarion_path
-                with open(pylarion_path, "r") as pyl_cfg:
-                    cfg_parser = ConfigParser.ConfigParser()
-                    cfg_parser.read(pyl_cfg)
-                    runner = cfg_parser.get("webservice", "user")
+                raise Exception("PylarionConfigurator did not get pylarion_user")
         return runner
 
     @profile
@@ -148,7 +144,7 @@ class Exporter(object):
 
             test_run.variant = self.transformer.config.distro.variant.lower()
             test_run.update()
-            test_run.arch = self.transformer.config.distro.arch
+            test_run.arch = self.transformer.config.distro.arch.replace("_", "")
 
             for tc in testngs:
                 tc.create_test_record(test_run, run_by=runner)

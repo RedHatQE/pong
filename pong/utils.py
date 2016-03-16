@@ -23,7 +23,6 @@ STATUS_MAP = {"PASS": PASS, "FAIL": FAIL, "SKIP": SKIP}
 DEFAULT_WORKSPACE = "/home/jenkins/workspace"
 DEFAULT_JENKINS_PROJECT = "stoner_gui_test_polarion"
 DEFAULT_RESULT_PATH = "test_output/pong-results.xml"
-TEST_REQUIREMENT_PREFIX = "RHSM "  # prefix to add to auto generated Requirement title
 
 TC_KEYS = {"caseimportance": "high", "caselevel": "component", "caseposneg": "positive",
            "testtype": "functional", "subtype1": "reliability", "caseautomation": "automated"}
@@ -61,7 +60,7 @@ def query_test_case(query, fields=None, **kwargs):
 def cached_tc_query(query, test_cases, multiple=False):
     def title_match(tc):
         klass, method_name = get_class_methodname(str(tc.title))
-        return klass == query
+        return klass in query
 
     matches = list(filter(title_match, test_cases))
     retval = []
@@ -264,7 +263,7 @@ def polarion_safe_string(string):
     return safe(string)
 
 
-def testify_requirement_name(test_name, prefix="RHSM "):
+def testify_requirement_name(test_name, prefix=""):
     """
     Generates a name for a Requirement by taking the <test name=XXX> name attribute, and prefixing with prefix
 

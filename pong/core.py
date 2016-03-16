@@ -31,12 +31,12 @@ class TestNGToPolarion(object):
     ALLOWED_FIELDS = ["name", "status", "signature", "is-config", "duration-ms", "started-at",
                       "finished-at", "description", "data-provider", "depends-on-methods"]
 
-    def __init__(self, attrs, title, test_case=None, result=None, params=None, project=None, requirement=None,
-                 testng_test=None):
+    def __init__(self, attrs, cm_name, test_case=None, result=None, params=None, project=None, requirement=None,
+                 testng_test=None, prefix=""):
         """
 
         :param attrs: A dict of the <test-method> attributes
-        :param title: The class.method name of the <test-method> (becomes the TestRecord title)
+        :param cm_name: The class.method name of the <test-method> (becomes the TestRecord title)
         :param test_case: A pylarion TestCase object
         :param result:
         :param params: A list of the arguments used from a data provider test
@@ -45,9 +45,9 @@ class TestNGToPolarion(object):
         :param testng_test: the <test name=""> that represents what logical test this object belongs to
         :return:
         """
-        self.title = title
+        self.class_method = cm_name
+        self.title = prefix + cm_name
         self.attributes = attrs
-        self.description = u"" if "description" not in attrs else unicode(attrs["description"], encoding="utf8")
         self.polarion_tc = test_case
         self.data_provider = "data-provider" in attrs
         self.params = [] if params is None else params
@@ -56,8 +56,17 @@ class TestNGToPolarion(object):
         self._status = None
         self.project = get_default_project() if project is None else project
         self._author = None
-        self.requirement = requirement # PylRequirement(project_id=self.project, work_item_id=requirement)
+        self.requirement = requirement  # PylRequirement(project_id=self.project, work_item_id=requirement)
         self.testng_test = testng_test
+
+        if "description" not in attrs:
+            self.description = u""
+        else:
+            try:
+                self.description = attrs["description"].decode(encoding="utf8")
+            except UnicodeError:
+                raw = attrs["description"].encode("utf-8")
+                self.description = unicode(raw, encoding="utf-8", errors="replace")
 
     @property
     def status(self):
@@ -171,6 +180,30 @@ class TestNGToPolarion(object):
             if not current:  # set to default
                 setattr(tc, key, val)
 
+    def link_requirements(self, tc_obj):
+        """
+
+        :param tc_obj:
+        :return:
+        """
+        linked_items = tc_obj.linked_work_items
+        if not self.requirement:
+            log.warning("No requirement exists for this test case")
+        else:
+            duplicates = filter(lambda x: x == self.requirement, [li.work_item_id for li in linked_items])
+            num_duplicates = len(duplicates)
+            if num_duplicates == 0:
+                log.info("Linking requirement {} to TestCase {}".format(self.requirement, tc_obj.work_item_id))
+                tc_obj.add_linked_item(self.requirement, "verifies")
+            elif num_duplicates > 1:
+                msg = "Found duplicate linked Requirements {} for TestCase {}.  Cleaning...."
+                log.warning(msg.format(itz.first(duplicates), tc_obj.work_item_id))
+                for _ in range(len(duplicates) - 1):
+                    tc_obj.remove_linked_item(self.requirement, "verifies")
+            else:
+                msg = "Requirement {} already linked to TestCase {}"
+                log.info(msg.format(itz.first(duplicates), tc_obj.work_item_id))
+
     @profile
     def create_polarion_tc(self):
         """
@@ -179,6 +212,7 @@ class TestNGToPolarion(object):
         t = lambda x: unicode.encode(x, encoding="utf-8", errors="ignore") if isinstance(x, unicode) else x
         desc, title = [t(x) for x in [self.description, self.title]]
         # Check to see if we already have an existing test case
+        tc = None
         if self.polarion_tc:
             log.info("Getting TestCase for {}: {}".format(title, desc))
             tc = self.polarion_tc
@@ -201,6 +235,20 @@ class TestNGToPolarion(object):
                 tc.set_test_steps([step])
         else:
             log.info("Generating new TestCase for {}: {}".format(title, desc))
+            WORKAROUND_925 = False
+            try:
+                self.description.decode(encoding="utf-8")
+            except UnicodeError:
+                raw = self.description.encode("utf-8")
+                self.description = unicode(raw, encoding="utf-8", errors="replace")
+                try:
+                    self.description.decode(encoding="utf-8")
+                except UnicodeError:
+                    WORKAROUND_925 = True
+
+            if WORKAROUND_925:
+                self.description = unicode("", encoding="utf-8")
+
             tc = PylTestCase.create(self.project, self.title, self.description, **TC_KEYS)
 
             # Create PylTestSteps if needed and add it
@@ -208,25 +256,11 @@ class TestNGToPolarion(object):
                 step = self.make_polarion_test_step()
                 tc.set_test_steps([step])
 
-        if not tc:
-            raise Exception("Could not create TestCase for {}".format(self.title))
-        else:
-            self.polarion_tc = tc
-
-        # FIXME: This code section should probably be moved into its own function
-        linked_items = tc.linked_work_items
-        if not self.requirement:
-            log.warning("No requirement exists for this test case")
-        else:
-            duplicates = filter(lambda x: x == self.requirement, [li.work_item_id for li in linked_items])
-            if not any(duplicates):
-                log.info("Linking requirement {} to TestCase {}".format(self.requirement, tc.work_item_id))
-                tc.add_linked_item(self.requirement, "verifies")
+            if not tc:
+                raise Exception("Could not create TestCase for {}".format(self.title))
             else:
-                msg = "Found duplicate linked Requirements {} for TestCase {}.  Cleaning...."
-                log.warning(msg.format(itz.first(duplicates), tc.work_item_id))
-                for _ in range(len(duplicates) - 1):
-                    tc.remove_linked_item(self.requirement, "verifies")
+                self.polarion_tc = tc
+            self.link_requirements(tc)
         return tc
 
     def make_polarion_test_step(self):
