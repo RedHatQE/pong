@@ -235,7 +235,7 @@ class TestNGToPolarion(object):
                 tc.set_test_steps([step])
         else:
             log.info("Generating new TestCase for {}: {}".format(title, desc))
-            WORKAROUND_925 = False
+            WORKAROUND_949 = False
             try:
                 self.description.decode(encoding="utf-8")
             except UnicodeError:
@@ -244,9 +244,9 @@ class TestNGToPolarion(object):
                 try:
                     self.description.decode(encoding="utf-8")
                 except UnicodeError:
-                    WORKAROUND_925 = True
+                    WORKAROUND_949 = True
 
-            if WORKAROUND_925:
+            if WORKAROUND_949:
                 self.description = unicode("", encoding="utf-8")
 
             tc = PylTestCase.create(self.project, self.title, self.description, **TC_KEYS)
