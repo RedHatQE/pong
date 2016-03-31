@@ -237,7 +237,7 @@ class ConfigRecord(PRecord):
     testrun_prefix = fieldm()
     testrun_suffix = fieldm()
     testrun_base = field()
-    base_queries = fieldm()
+    testcases_query = fieldm()
     requirements_query = fieldm()
     environment_file = field()
     exporter_config = field()
@@ -412,12 +412,12 @@ class CLIConfigRecord(PRecord):
                                help="See testrun_prefix")
     testrun_base = add_field("--testrun-base",
                              help="See testrun_prefix.  Defaults to the <suite name=> from the testng-results.xml")
-    base_queries = add_field("-b", "--base-queries",
+    testcases_query = add_field("-b", "--testcases-query",
                              mandatory=True,
                              nargs='*',
-                             invariant=lambda x: ((x is not None, "base_queries is not None"),
-                                                  (is_sequence(x), "base_queries is a sequence"),
-                                                  (sequence_vals_truthy(x), "base_queries values are truthy")),
+                             invariant=lambda x: ((x is not None, "testcases_query is not None"),
+                                                  (is_sequence(x), "testcases_query is a sequence"),
+                                                  (sequence_vals_truthy(x), "testcases_query values are truthy")),
                              help="A list of space separated strings that will be used for lucene based TestCase title "
                                   "searches For example, if all your test cases have rhel-<6|7>-test "
                                   " in them, then do: '-b rhel-6-test rhel-7-test'.  Another way to do this is like"
@@ -455,8 +455,10 @@ class CLIConfigRecord(PRecord):
 
     @classmethod
     def parse_args(cls, args=""):
-        if args:
+        if args and isinstance(args, str):
             return cls.factory.parser.parse_args(args.split())
+        elif args and isinstance(args, type([])):
+            return cls.factory.parser.parse_args(args)
         else:
             return cls.factory.parser.parse_args()
 
@@ -754,7 +756,7 @@ def dprint(m, log_lvl=DEFAULT_LOG_LEVEL):
         log.log(log_lvl, kv)
 
 
-def kickstart(yaml_path=None):
+def kickstart(yaml_path=None, args=None):
     """
     Kicks everything off by creating the configuration function pipeline
 
@@ -777,7 +779,7 @@ def kickstart(yaml_path=None):
     jnk_cfg = None
     if env_path:
         jnk_cfg = JenkinsConfigurator(env_path)
-    cli_cfg = CLIConfigurator()
+    cli_cfg = CLIConfigurator(args=args)
 
     if env_path:
         pipeline = compose(cli_cfg, jnk_cfg, yml_cfg, env_cfg, pyl_cfg)
@@ -838,7 +840,7 @@ def cli_print(cfg_map):
             return fmt("user", val)
         elif name == "pylarion_password":
             return fmt("password", val)
-        elif name == "base_queries":
+        elif name == "testcases_query":
             mapper = partial(map, lambda q: '"{}"'.format(q))
             if isinstance(val, str):
                 v = val.replace("['", "")
@@ -869,7 +871,7 @@ def extractor(text):
     1455641905.55-pong.logger-INFO: 	testrun_template=RHSM RHEL6-8
     1455641905.55-pong.logger-INFO: 	get_latest_testrun=False
     1455641905.56-pong.logger-INFO: 	set_project=False
-    1455641905.56-pong.logger-INFO: 	base_queries=['rhsm.*.tests*']
+    1455641905.56-pong.logger-INFO: 	testcases_query=['rhsm.*.tests*']
     1455641905.56-pong.logger-INFO: 	project_id=RHEL6
     1455641905.56-pong.logger-INFO: 	generate_only=False
     1455641905.56-pong.logger-INFO: 	testrun_suffix=Server x86_64 Run

@@ -185,11 +185,11 @@ class Transformer(object):
         self.project_id = config.project_id
         self._existing_requirements = existing_reqs
         self.quick_query = quick_query
-        self.base_queries = [] if config.base_queries is None else config.base_queries
+        self.testcases_query = [] if config.testcases_query is None else config.testcases_query
         self.config = config
 
         existing_test_cases = []
-        for base in self.base_queries:
+        for base in self.testcases_query:
             #bq = 'title:{}'.format(base)
             log.info("Performing Polarion query of {}".format(base))
             tcs = query_test_case(base)
@@ -272,6 +272,7 @@ class Transformer(object):
         for test in suite.iter("test"):
             attributes = test.attrib
             requirement_name = testify_requirement_name(attributes["name"], prefix=prefix)
+            base_requirement = attributes["name"]
             if requirement_name not in requirements_set:
                 # First, check to see if we've got a requirement with this name, and if not, create one
                 # query = title_query(requirement_name)

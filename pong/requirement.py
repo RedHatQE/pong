@@ -10,7 +10,7 @@ def is_requirement_exists(title):
 
     def fltr(r):
         print "Checking", unicode(r.title)
-        return title == unicode(r.title)
+        return title in unicode(r.title)
 
     try:
         res = first(filter(fltr, reqs))
@@ -20,7 +20,7 @@ def is_requirement_exists(title):
 
 
 def is_in_requirements(title, requirements):
-    titles = list(filter(lambda r: title == str(r.title), requirements))
+    titles = list(filter(lambda r: title in str(r.title), requirements))
 
     if len(titles) > 2:
         raise Exception("Should not have multiple matches on Requirements")

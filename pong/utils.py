@@ -24,8 +24,12 @@ DEFAULT_WORKSPACE = "/home/jenkins/workspace"
 DEFAULT_JENKINS_PROJECT = "stoner_gui_test_polarion"
 DEFAULT_RESULT_PATH = "test_output/pong-results.xml"
 
-TC_KEYS = {"caseimportance": "high", "caselevel": "component", "caseposneg": "positive",
-           "testtype": "functional", "subtype1": "reliability", "caseautomation": "automated"}
+TC_KEYS = {"caseimportance": "high",
+           "caselevel": "component",
+           "caseposneg": "positive",
+           "testtype": "functional",
+           "subtype1": "reliability",
+           "caseautomation": "automated"}
 
 
 def get_class_methodname(s):

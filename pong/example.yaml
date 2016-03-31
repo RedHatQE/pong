@@ -15,6 +15,6 @@ distro_major: 6
 distro_minor: 8
 distro_arch: x86_64
 distro_variant: Server
-base_queries:
+testcases_query:
   - "rhsm.*.tests*"
 environment_file: None

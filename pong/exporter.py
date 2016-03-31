@@ -143,8 +143,10 @@ class Exporter(object):
             test_run.status = "inprogress"
 
             test_run.variant = self.transformer.config.distro.variant.lower()
-            test_run.update()
             test_run.arch = self.transformer.config.distro.arch.replace("_", "")
+
+            # FIXME: Remove comment when POLARION-925 is fixed
+            # test_run.update()
 
             for tc in testngs:
                 tc.create_test_record(test_run, run_by=runner)
@@ -255,7 +257,7 @@ class Exporter(object):
         if config.project_id != default_project_id:
             CLIConfigurator.set_project_id(using_pylarion_path, config.project_id)
 
-        default_queries = [] if args.base_queries is None else args.base_queries
+        default_queries = [] if args.testcases_query is None else args.testcases_query
         transformer = Transformer(config)
         suite = Exporter(transformer)
 
