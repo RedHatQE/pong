@@ -172,6 +172,15 @@ requirement_prefix:     # If given, this string will be prepended to the autogen
 requirements_query:     # A lucene query to look up Requirements for caching
 ```
 
+## Explanation of the queries
+
+Note that 2 of the configuration parameters are required and there is no default.  The user must provide a lucene style
+query for testcases_query and requirements_query
+
+The purpose of these queries is to retrieve from Polarion any existing TestCases or Requirements respectively so that
+they are cached (rather than making a separate query for each and every TestCase and Requirement).  How the user wishes
+to create the query is up to them.  The rhsm-qe team uses a query based on the title: 
+
 
 ## Breakdown of modules
 
