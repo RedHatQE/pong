@@ -77,6 +77,7 @@ class TestNGToPolarion(object):
         """
         if self._status is None:
             result = self.attributes["status"]
+            log.debug("Checking step_results of {}: {}".format(self.title, self.step_results))
             no_nones = filter(lambda x: x is not None, self.step_results)
             self.step_results = no_nones
             if any(filter(lambda ti: ti.status != "PASS" and ti.status != "SKIP", self.step_results)):
