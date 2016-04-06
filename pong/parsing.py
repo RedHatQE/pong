@@ -1,3 +1,7 @@
+"""
+
+"""
+
 import xml.etree.ElementTree as ET
 from urllib2 import urlopen
 from urlparse import urlparse
@@ -161,9 +165,6 @@ class Transformer(object):
 
          - Generate a TestCase if needed, and link to the Requirement of the <test>
     """
-    # def __init__(self, project_id=None, result_path=None, template_id, requirement_prefix=TEST_REQUIREMENT_PREFIX,
-    #             testrun_prefix="", existing_reqs=None, quick_query=True, base_queries=None,
-    #             testrun_suffix="testing"):
     def __init__(self, config, existing_reqs=None, quick_query=True, ):
         """
 
@@ -190,7 +191,6 @@ class Transformer(object):
 
         existing_test_cases = []
         for base in self.testcases_query:
-            #bq = 'title:{}'.format(base)
             log.info("Performing Polarion query of {}".format(base))
             tcs = query_test_case(base)
             existing_test_cases.extend(tcs)
@@ -426,7 +426,6 @@ class TNGTestMethod(object):
         ptc = None
         if self._p_testcase is None:
             for match in matches:
-                #klass, methodname = get_class_methodname(match.title)
                 class_method = match.title.replace(self.tc_prefix, "")
 
                 if class_method == self.full_name:
