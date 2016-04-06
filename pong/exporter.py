@@ -51,7 +51,7 @@ class Exporter(object):
 
         for k, tests in testng_suites.items():
             not_skipped = tests
-            if self.transformer.config.test_case_skips:
+            if not self.transformer.config.test_case_skips:
                 not_skipped = filter(lambda x: x.status != SKIP, tests)
             # TODO: It would be nice to have show which Tests got skipped due to dependency on another
             # test that failed, or because of a BZ blocker
