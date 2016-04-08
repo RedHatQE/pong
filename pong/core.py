@@ -131,7 +131,6 @@ class TestNGToPolarion(object):
 
         def comment_string(i, s):
             base = "{} {}\t".format(i, s.status)
-            # This seems to be dramatically slowing down Polarion, so take it out for now
             if s.exception:
                 exc_info = s.exception["message"] + "<br>" + \
                            s.exception["stack_trace"] + "<br>"
