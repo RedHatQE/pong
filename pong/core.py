@@ -132,8 +132,8 @@ class TestNGToPolarion(object):
         def comment_string(i, s):
             base = "{} {}\t".format(i, s.status)
             if s.exception:
-                exc_info = s.exception["message"] + "<br>" + \
-                           s.exception["stack_trace"] + "<br>"
+                exc_info = s.exception.get("message", "") + "<br>" + \
+                           s.exception.get("stack_trace", "") + "<br>"
                 base += "<br>" + exc_info
             return base
 
