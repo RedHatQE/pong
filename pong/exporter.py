@@ -143,9 +143,11 @@ class Exporter(object):
             test_run.status = "inprogress"
 
             test_run.variant = self.transformer.config.distro.variant.lower()
-            test_run.arch = self.transformer.config.distro.arch.replace("_", "")
+            test_run.jenkinsjobs = self.transformer.config.testrun_jenkinsjobs
+            test_run.notes = self.transformer.config.testrun_notes
 
             # FIXME: Remove comment when POLARION-925 is fixed
+            # test_run.arch = self.transformer.config.distro.arch.replace("_", "")
             # test_run.update()
 
             for tc in testngs:
