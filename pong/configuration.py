@@ -686,8 +686,8 @@ class PylarionConfigurator(Configurator):
         if not os.path.exists(path):
             raise Exception("{} does not exist".format(path))
         with open(path) as fp:
-            cfg = cparser.readfp(fp)
-            return cfg
+            cparser.readfp(fp)
+        return cparser
 
 
 def finalize(pipelined_map):
