@@ -78,13 +78,28 @@ def remove_linked_requirements_from_tests(test_cases):
     :param test_cases:
     :return:
     """
-    for tc in test_cases:
-        tc = TestCase(uri=tc.uri)
-        tc.linked_work_items = []
-        tc.update()
+    with open("/tmp/tc_delete.txt", "w") as tcd:
+        for tc in test_cases:
+            tc = TestCase(uri=tc.uri)
+            linked_items  = tc.linked_work_items
+            for li in linked_items:
+                tc.remove_linked_item(li.work_item_id, "verifies")
+            tc.title = "DeleteMe"
+            if tc.author == "ci-user":
+                tc.author = "stoner"
+            tcd.write(tc.work_item_id + "\n")
+            tcd.flush()
+            tc.update()
+
+
+def edit_tc_title(tc_, prefix):
+    tc = TestCase(uri=tc_.uri)
+    tc.title += prefix
+    tc.update()
 
 tcs = query_test_case("title:rhsm.*.tests*")
 bad = list(filter(lambda tc: not tc.title.startswith("RHSM-TC"), tcs))
+remove_linked_requirements_from_tests(bad)
 
 if 0:
     for tc in tcs:
