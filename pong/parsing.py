@@ -372,7 +372,7 @@ class TNGTestClass(object):
         self.element = test_elem
 
     def find_me(self, meth_name, existing_tests=None, multiple=True):
-        log.info("Querying Polarion for: {}".format(self.query_title))
+        log.debug("Querying Polarion for: {}".format(self.query_title))
         if existing_tests is None:
             matches = query_test_case(self.query_title)
         else:
@@ -436,6 +436,7 @@ class TNGTestMethod(object):
                 if class_method == self.full_name:
                     log.info("Found existing TestCase in Polarion: {}".format(match.title))
                     ptc = PylTestCase(uri=match.uri)
+                    break
         else:
             ptc = self._p_testcase
         return ptc
