@@ -1,5 +1,4 @@
 from pong.utils import *
-from pylarion.work_item import Requirement
 from toolz import first
 from pong.logger import log
 
@@ -32,6 +31,7 @@ def is_in_requirements(title, requirements):
 
 def create_requirement(project_id, title, description="", reqtype="functional",
                        severity="should_have"):
+    from pylarion.work_item import Requirement
     req = is_requirement_exists(title)
     if req:
         log.info("Found existing Requirement {}".format(req.title))

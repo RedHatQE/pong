@@ -113,6 +113,7 @@ class Exporter(object):
         :param runner: str of the user id (eg stoner, not "Sean Toner")
         :return: None
         """
+        from pylarion.test_run import TestRun
         runner = self.get_runner(runner)
 
         for s, testngs in self.tests.items():
@@ -181,6 +182,7 @@ class Exporter(object):
         :param test_run_id:
         :return:
         """
+        from pylarion.test_run import TestRun
         tr = TestRun.search('"{}"'.format(test_run_id), fields=[u"test_run_id"],
                             sort="created")
         tr = itz.first(tr)
@@ -197,6 +199,7 @@ class Exporter(object):
         :param query:
         :return:
         """
+        from pylarion.test_run import TestRun
         test_template = TestRun.create_template(self.project, template_id, query=query,
                                                 select_test_cases_by=case_type)
         return test_template

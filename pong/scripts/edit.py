@@ -70,9 +70,25 @@ def fix_tc_title(tc):
     except:
         print "Failed to update {}".format(wi.title)
 
+
+def remove_linked_requirements_from_tests(test_cases):
+    """
+    Removes all linked Items from TestCase objects in test_Cases
+
+    :param test_cases:
+    :return:
+    """
+    for tc in test_cases:
+        tc = TestCase(uri=tc.uri)
+        tc.linked_work_items = []
+        tc.update()
+
 tcs = query_test_case("title:rhsm.*.tests*")
-for tc in tcs:
-    fix_tc_title(tc)
+bad = list(filter(lambda tc: not tc.title.startswith("RHSM-TC"), tcs))
+
+if 0:
+    for tc in tcs:
+        fix_tc_title(tc)
 
 if 0:
     reqs = query_requirement("title:RHSM-REQ AND author.id:ci\-user")

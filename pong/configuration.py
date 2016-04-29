@@ -856,7 +856,7 @@ def cli_print(cfg_map):
                 all = " ".join(mapper(v2.split()))
             else:
                 all = " ".join(mapper(val))
-            return "--base-queries " + all
+            return "--testcases-query " + all
         else:
             return fmt(name, val)
 

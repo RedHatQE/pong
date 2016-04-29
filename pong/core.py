@@ -1,6 +1,4 @@
 from pong.utils import *
-from pylarion.work_item import TestSteps as PylTestSteps
-from pylarion.work_item import TestStep as PylTestStep
 
 from pong.logger import log
 import datetime
@@ -46,6 +44,7 @@ class TestNGToPolarion(object):
         :return:
         """
         self.class_method = cm_name
+        self.prefix = prefix
         self.title = prefix + cm_name
         self.attributes = attrs
         self.polarion_tc = test_case
@@ -104,6 +103,7 @@ class TestNGToPolarion(object):
     def query_test_case(self, query=None):
         """
         """
+        from pylarion.work_item import TestCase as PylTestCase
         if query is None:
             query = "title:{}".format(self.title)
         return PylTestCase.query(query)
@@ -115,6 +115,7 @@ class TestNGToPolarion(object):
 
         :return:
         """
+        from pylarion.work_item import TestSteps as PylTestSteps
         steps = PylTestSteps()
         steps.keys = ["args", "expectedResult"]
 
@@ -220,6 +221,9 @@ class TestNGToPolarion(object):
             tc = self.polarion_tc
             self.validate_test(tc)
 
+            if not self.polarion_tc.title.startswith(self.prefix):
+                self.polarion_tc.title = self.prefix + self.polarion_tc.title
+
             # See if the Polarion Test Case has steps. The TestCase will contain a TestSteps array of size 1
             # The step will have 2 columns (or key-value pairs)
             # | step | expectedResult
@@ -251,6 +255,7 @@ class TestNGToPolarion(object):
             if WORKAROUND_949:
                 self.description = unicode("", encoding="utf-8")
 
+            from pylarion.work_item import TestCase as PylTestCase
             tc = PylTestCase.create(self.project, self.title, self.description, **TC_KEYS)
 
             # Create PylTestSteps if needed and add it
@@ -269,6 +274,7 @@ class TestNGToPolarion(object):
         """
         Creates pylarion TestSteps
         """
+        from pylarion.work_item import TestStep as PylTestStep
         ts = PylTestStep()
         args = ",".join(["Arg{}".format(i) for i in range(len(self.params))])
         step_args = unicode(args, encoding='utf-8')
