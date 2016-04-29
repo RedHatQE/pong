@@ -61,9 +61,9 @@ def query_test_case(query, fields=None, **kwargs):
 
 def cached_tc_query(query, test_cases, multiple=False):
     def title_match(tc):
-        klass, method_name = get_class_methodname(str(tc.title))
-        cm = klass + "." + method_name
-        return cm in query
+        #klass, method_name = get_class_methodname(str(tc.title))
+        res = query in tc.title
+        return res
 
     matches = list(filter(title_match, test_cases))
     retval = []
