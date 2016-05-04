@@ -3,7 +3,8 @@
 """
 
 import xml.etree.ElementTree as ET
-from urllib2 import urlopen
+#from urllib2 import urlopen
+from urllib3 import PoolManager
 from urlparse import urlparse
 
 from pong.core import TestIterationResult, TestNGToPolarion
@@ -112,17 +113,17 @@ def add_step(steps, title, attrs, new_row, exception=None, output=None,
 
 
 def download_url(urlpath, output_dir=".", binary=False):
-    try:
-        thing = urlopen(urlpath)
-    except Exception as e:
-        print(str(e))
-        return
+
+    http = PoolManager()
+    req = http.request("GET", urlpath)
+    if req.status != 200:
+        raise Exception("Could not get file from " + urlpath)
 
     parsed = urlparse(urlpath)
     filename = os.path.basename(parsed.path)
     writemod = "wb" if binary else "w"
 
-    fobj = thing.read()
+    contents = req.data
     if output_dir != ".":
         if not os.path.exists(output_dir):
             log.error("{0} does not exist".format(output_dir))
@@ -131,10 +132,10 @@ def download_url(urlpath, output_dir=".", binary=False):
             filename = "/".join([output_dir, filename])
     with open(filename, writemod) as downloaded:
         try:
-            downloaded.write(fobj)
+            downloaded.write(contents)
         except TypeError:
             with open(filename, "wb") as downloaded:
-                downloaded.write(fobj)
+                downloaded.write(contents)
     if not os.path.exists(filename):
         raise Exception("Could not write to {}".format(filename))
     return filename
@@ -328,8 +329,8 @@ class Transformer(object):
 
         req_work_id = requirement.work_item_id
         for klass in test.iter("class"):
-            tc_query = '"{}"'.format(tc_prefix + klass.attrib["name"])
-            t_class = TNGTestClass(test, klass.attrib, tc_query)
+            #tc_query = '"{}"'.format(tc_prefix + klass.attrib["name"])
+            t_class = TNGTestClass(test, klass.attrib, '"{}"'.format(klass.attrib["name"]), tc_prefix)
             testng = None
             testng_test_name = tc_prefix + test.attrib["name"]
             last_test_method = None
@@ -365,17 +366,20 @@ class Transformer(object):
 
 
 class TNGTestClass(object):
-    def __init__(self, test_elem, attribs, query):
+    def __init__(self, test_elem, attribs, query, prefix):
         self.name = attribs["name"]
-        self.query_title = "title:{}".format(query)
+        self.prefix = prefix
+        self.query_title = query
+        self.element = test_elem
 
-    def find_me(self, existing_tests=None, multiple=True):
-        log.info("Querying Polarion for: {}".format(self.query_title))
+    def find_me(self, meth_name, existing_tests=None, multiple=True):
+        log.debug("Querying Polarion for: {}".format(self.query_title))
         if existing_tests is None:
             matches = query_test_case(self.query_title)
         else:
             # matches = cached_tc_query(self.name, existing_tests, multiple=multiple)
-            matches = cached_tc_query(self.query_title, existing_tests, multiple=multiple)
+            query = self.name + "." + meth_name
+            matches = cached_tc_query(query, existing_tests, multiple=multiple)
         return matches
 
 
@@ -411,6 +415,7 @@ class TNGTestMethod(object):
 
     @p_testcase.setter
     def p_testcase(self, val):
+        from pylarion.work_item import TestCase as PylTestCase
         if not isinstance(val, PylTestCase):
             raise Exception("p_testcase must be a pylarion.work_item.TestCase object")
         self._p_testcase = val
@@ -421,16 +426,18 @@ class TNGTestMethod(object):
 
         :return: pylarion.work_item.TestCase
         """
-        matches = self.parent_class.find_me(existing_tests=self.cached, multiple=True)
+        matches = self.parent_class.find_me(self.method_name, existing_tests=self.cached, multiple=True)
 
         ptc = None
         if self._p_testcase is None:
+            from pylarion.work_item import TestCase as PylTestCase
             for match in matches:
                 class_method = match.title.replace(self.tc_prefix, "")
 
                 if class_method == self.full_name:
                     log.info("Found existing TestCase in Polarion: {}".format(match.title))
                     ptc = PylTestCase(uri=match.uri)
+                    break
         else:
             ptc = self._p_testcase
         return ptc

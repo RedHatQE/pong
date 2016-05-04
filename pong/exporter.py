@@ -102,6 +102,24 @@ class Exporter(object):
                 raise Exception("PylarionConfigurator did not get pylarion_user")
         return runner
 
+    def get_template(self, temp_id):
+        """
+        Gets a TestRun template
+
+        :param temp_id:
+        :return:
+        """
+        from pylarion.test_run import TestRun
+
+        for x in ["-", "."]:
+            if x in temp_id:
+                temp_id = temp_id.replace(x, "\{}".format(x))
+        t_runs = TestRun.search('{}'.format(temp_id), fields=["test_run_id", "created", "status"], sort="created",
+                                search_templates=True)
+        tr = itz.first(t_runs)
+        return TestRun(uri=tr.uri)
+
+
     @profile
     def create_test_run(self, template_id, test_run_base=None, runner=None):
         """
@@ -113,9 +131,15 @@ class Exporter(object):
         :param runner: str of the user id (eg stoner, not "Sean Toner")
         :return: None
         """
+        from pylarion.test_run import TestRun
         runner = self.get_runner(runner)
 
+        tr_temp = self.get_template(template_id)
+        log.info(tr_temp.plannedin)
+
         for s, testngs in self.tests.items():
+            if not testngs:
+                continue
             if test_run_base is None:
                 base_name = self.transformer.generate_base_testrun_id(s)
             else:
@@ -132,7 +156,7 @@ class Exporter(object):
             retries = 3
             while retries > 0:
                 try:
-                    test_run = TestRun.create(self.project, new_id, template_id)
+                    test_run = TestRun.create(self.project, new_id, template_id, plannedin=tr_temp.plannedin)
                     break
                 except Exception as ex:
                     log.warning("Got exception {}".format(ex))
@@ -142,19 +166,20 @@ class Exporter(object):
                 raise Exception("Could not create a new TestRun")
             test_run.status = "inprogress"
 
-            test_run.variant = self.transformer.config.distro.variant.lower()
-            test_run.jenkinsjobs = self.transformer.config.testrun_jenkinsjobs
-            test_run.notes = self.transformer.config.testrun_notes
-
             # FIXME: Remove comment when POLARION-925 is fixed
-            # test_run.arch = self.transformer.config.distro.arch.replace("_", "")
-            # test_run.update()
+            POLARION_925 = True
+            if not POLARION_925:
+                test_run.variant = self.transformer.config.distro.variant.lower()
+                test_run.jenkinsjobs = self.transformer.config.testrun_jenkinsjobs
+                test_run.notes = self.transformer.config.testrun_notes
+                test_run.arch = self.transformer.config.distro.arch.replace("_", "")
 
             for tc in testngs:
                 tc.create_test_record(test_run, run_by=runner)
 
-            log.info("Created test run for {}".format(new_id))
             test_run.status = "finished"
+            test_run.update()
+            log.info("Created test run for {}".format(new_id))
 
     def update_test_run(self, test_run, runner="stoner"):
         """
@@ -181,6 +206,7 @@ class Exporter(object):
         :param test_run_id:
         :return:
         """
+        from pylarion.test_run import TestRun
         tr = TestRun.search('"{}"'.format(test_run_id), fields=[u"test_run_id"],
                             sort="created")
         tr = itz.first(tr)
@@ -197,6 +223,7 @@ class Exporter(object):
         :param query:
         :return:
         """
+        from pylarion.test_run import TestRun
         test_template = TestRun.create_template(self.project, template_id, query=query,
                                                 select_test_cases_by=case_type)
         return test_template
@@ -271,7 +298,6 @@ class Exporter(object):
                 tr = Exporter.get_test_run(update_id)
                 suite.update_test_run(tr)
             else:
-                log.info("Creating new TestRun...")
                 suite.create_test_run(config.testrun_template)
         log.info("TestRun information completed to Polarion")
 

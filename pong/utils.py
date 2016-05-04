@@ -9,9 +9,6 @@ from itertools import repeat
 
 from toolz import itertoolz as itz
 from toolz import functoolz as ftz
-from pylarion.work_item import TestCase as PylTestCase
-from pylarion.work_item import Requirement
-from pylarion.test_run import TestRun
 
 from pong.decorators import retry, profile
 
@@ -58,13 +55,15 @@ def query_test_case(query, fields=None, **kwargs):
     """
     if fields is None:
         fields = ["work_item_id", "title"]
+    from pylarion.work_item import TestCase as PylTestCase
     return PylTestCase.query(query, fields=fields, **kwargs)
 
 
 def cached_tc_query(query, test_cases, multiple=False):
     def title_match(tc):
-        klass, method_name = get_class_methodname(str(tc.title))
-        return klass in query
+        #klass, method_name = get_class_methodname(str(tc.title))
+        res = query in tc.title
+        return res
 
     matches = list(filter(title_match, test_cases))
     retval = []
@@ -94,6 +93,7 @@ def query_requirement(query, fields=None, **kwargs):
     """
     if fields is None:
         fields = ["work_item_id", "title"]
+    from pylarion.work_item import Requirement
     return Requirement.query(query, fields=fields, **kwargs)
 
 
@@ -163,6 +163,7 @@ def get_latest_test_run(test_run_name):
     :param test_run_name: test run id string
     :return: TestRun
     """
+    from pylarion.test_run import TestRun
     s = TestRun.search('"{}"'.format(test_run_name),
                        fields=["test_run_id", "created", "status"],
                        sort="created")
@@ -184,7 +185,8 @@ def get_test_run(project_id, test_run_id):
     :param test_run_id: str of the test run id
     :return:
     """
-    tr = TestRun(project_id=project_id, test_run_id=test_run_id)
+    from pylarion.test_run import TestRun as PylTestRun
+    tr = PylTestRun(project_id=project_id, test_run_id=test_run_id)
     return tr
 
 
