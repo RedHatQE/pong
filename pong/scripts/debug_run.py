@@ -36,8 +36,10 @@ cfg.read(["section"])
 
 cfgget = partial(cfg.get, "default")
 
-keys = ["PROJECT_ID", "RESULT_PATH", "ARTIFACT_ARCHIVE", "BASE_QUERIES", "DISTRO",
-        "TESTRUN_PREFIX", "TESTRUN_SUFFIX", "TESTRUN_TEMPLATE"]
+keys = ["PROJECT_ID", "RESULT_PATH", "ARTIFACT_ARCHIVE", "TESTCASES_QUERY", "REQUIREMENTS_QUERY",
+        "DISTRO", "REQUIREMENT_PREFIX", "TESTCASE_PREFIX",
+        "TESTRUN_PREFIX", "TESTRUN_SUFFIX", "TESTRUN_TEMPLATE",
+        "TESTRUN_JENKINS_JOBS", "TESTRUN_NOTES"]
 
 
 def converter(name):
@@ -53,9 +55,12 @@ for opts in cmdline_args:
     arglist.extend(opts)
 
 #  We need to add the new requirements if they don't exist
-arglist.extend(["--testcase-prefix", "RHSM-TC : "])
-arglist.extend(["--requirement-prefix", "RHSM-REQ : "])
-arglist.extend(["--requirements-query", "title:RHSM-REQ AND author.id:ci\-user"])
+if 0:
+    arglist.extend(["--testcase-prefix", "RHSM-TC : "])
+    arglist.extend(["--requirement-prefix", "RHSM-REQ : "])
+    arglist.extend(["--requirements-query", "title:RHSM-REQ AND author.id:ci\-user"])
+
+arglist.extend(["--test-case-skips", "True"])
 
 
 config_map = kickstart(args=arglist)
