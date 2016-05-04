@@ -65,7 +65,7 @@ class Exporter(object):
             for i, test_case in enumerate(not_skipped, start=0):
                 log.info("Getting TestCase: {} out of {}".format(i, total))
                 pyl_tc = test_case.create_polarion_tc()
-                self._update_tc(pyl_tc)
+
                 test_case.polarion_tc = pyl_tc
                 updated.append(test_case)
 

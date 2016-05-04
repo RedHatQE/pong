@@ -240,7 +240,7 @@ class TestNGToPolarion(object):
                 step = self.make_polarion_test_step()
                 tc.set_test_steps([step])
         else:
-            log.info("Generating new TestCase for {}: {}".format(title, desc))
+            log.info("Generating new TestCase for {} : {}".format(title, desc))
             WORKAROUND_949 = False
             try:
                 self.description.decode(encoding="utf-8")
@@ -267,7 +267,9 @@ class TestNGToPolarion(object):
                 raise Exception("Could not create TestCase for {}".format(self.title))
             else:
                 self.polarion_tc = tc
-            self.link_requirements(tc)
+
+        self.link_requirements(tc)
+        self.polarion_tc.update()
         return tc
 
     def make_polarion_test_step(self):

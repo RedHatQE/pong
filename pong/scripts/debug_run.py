@@ -21,6 +21,7 @@ from pong.configuration import kickstart
 
 parser = ArgumentParser()
 parser.add_argument("-u", "--url")
+parser.add_argument("-r", "--result-path")
 args = parser.parse_args()
 
 pong_params = download_url(args.url)
@@ -61,6 +62,11 @@ if 0:
     arglist.extend(["--requirements-query", "title:RHSM-REQ AND author.id:ci\-user"])
 
 arglist.extend(["--test-case-skips", "True"])
+
+for i,arg in enumerate(arglist):
+    if arg == "--result-path" and args.result_path is not None:
+        arglist[i+1] = args.result_path
+        break
 
 
 config_map = kickstart(args=arglist)
