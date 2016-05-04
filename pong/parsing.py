@@ -3,7 +3,8 @@
 """
 
 import xml.etree.ElementTree as ET
-from urllib2 import urlopen
+#from urllib2 import urlopen
+from urllib3 import PoolManager
 from urlparse import urlparse
 
 from pong.core import TestIterationResult, TestNGToPolarion
@@ -112,17 +113,17 @@ def add_step(steps, title, attrs, new_row, exception=None, output=None,
 
 
 def download_url(urlpath, output_dir=".", binary=False):
-    try:
-        thing = urlopen(urlpath)
-    except Exception as e:
-        print(str(e))
-        return
+
+    http = PoolManager()
+    req = http.request("GET", urlpath)
+    if req.status != 200:
+        raise Exception("Could not get file from " + urlpath)
 
     parsed = urlparse(urlpath)
     filename = os.path.basename(parsed.path)
     writemod = "wb" if binary else "w"
 
-    fobj = thing.read()
+    contents = req.data
     if output_dir != ".":
         if not os.path.exists(output_dir):
             log.error("{0} does not exist".format(output_dir))
@@ -131,10 +132,10 @@ def download_url(urlpath, output_dir=".", binary=False):
             filename = "/".join([output_dir, filename])
     with open(filename, writemod) as downloaded:
         try:
-            downloaded.write(fobj)
+            downloaded.write(contents)
         except TypeError:
             with open(filename, "wb") as downloaded:
-                downloaded.write(fobj)
+                downloaded.write(contents)
     if not os.path.exists(filename):
         raise Exception("Could not write to {}".format(filename))
     return filename

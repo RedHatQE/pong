@@ -4,3 +4,4 @@ python-logstash
 suds
 requests
 pyyaml
+urllib3
