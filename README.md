@@ -5,15 +5,15 @@ It is TestNG specific since the junit report that TestNG generates misses some i
 
 ## What pong does
 
-- Creates one TestRun per <suite> element in the testng-results.xml
-- Parses the xml file for each <test-method> creating a TestRecord based on it
-- Uses the class and name attributes from <teset-method> as a partial TestCase
+- Creates one TestRun per \<suite\> element in the testng-results.xml
+- Parses the xml file for each \<test-method\> creating a TestRecord based on it
+- Uses the class and name attributes from \<teset-method\> as a partial TestCase
   - If this ID does not exist in Polarion for a TestCase, it will auto-generate a TestCase
 - Uses the <class> element to get a partial ID for a Requirements
   - If this ID does not exist in Polarion for a Requirement, it will auto-generate a Requirement
 - Links the TestCase to the Requirement if it is not already
 - Generates a new TestRun ID based on configuration properties (prefix, base, and suffix)
-  - Creates TestRecords in Polarion based on the <test-method>
+  - Creates TestRecords in Polarion based on the \<test-method\>
   - Links the TestRecord with the TestCase
   - Adds the TestRecords to the TestRun
 
