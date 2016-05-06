@@ -23,6 +23,7 @@ from pong.decorators import retry, profile
 from pong.parsing import Transformer
 from pong.configuration import kickstart, CLIConfigurator, cli_print
 
+POLARION_925 = True
 OLD_EXPORTER = 0
 TESTING = 0
 
@@ -114,10 +115,22 @@ class Exporter(object):
         for x in ["-", "."]:
             if x in temp_id:
                 temp_id = temp_id.replace(x, "\{}".format(x))
-        t_runs = TestRun.search('{}'.format(temp_id), fields=["test_run_id", "created", "status"], sort="created",
+        t_runs = TestRun.search('"{}"'.format(temp_id), fields=["test_run_id", "created", "is_template"],
+                                sort="created",
                                 search_templates=True)
-        tr = itz.first(t_runs)
-        return TestRun(uri=tr.uri)
+        from pylarion.exceptions import PylarionLibException
+        tr = None
+        for t in t_runs:
+            tr = TestRun(uri=t.uri)
+            try:
+                if tr.plannedin is not None:
+                    break
+            except PylarionLibException:
+                pass
+        else:
+            raise Exception("Could not find template")
+
+        return tr
 
 
     @profile
@@ -156,18 +169,22 @@ class Exporter(object):
             retries = 3
             while retries > 0:
                 try:
-                    test_run = TestRun.create(self.project, new_id, template_id, plannedin=tr_temp.plannedin)
+                    test_run = TestRun.create(self.project, new_id, template_id)
                     break
                 except Exception as ex:
                     log.warning("Got exception {}".format(ex))
                     retries -= 1
-                    log.warning("Retrying {} more times".format(retries))
+                    log.warning("Manually adding in the plannedin field")
+                    try:
+                        test_run = TestRun.create(self.project, new_id, template_id, plannedin=tr_temp.plannedin)
+                        break
+                    except Exception as ex:
+                        log.warning("Retrying {} more times".format(retries))
             else:
                 raise Exception("Could not create a new TestRun")
             test_run.status = "inprogress"
 
             # FIXME: Remove comment when POLARION-925 is fixed
-            POLARION_925 = True
             if not POLARION_925:
                 test_run.variant = self.transformer.config.distro.variant.lower()
                 test_run.jenkinsjobs = self.transformer.config.testrun_jenkinsjobs
