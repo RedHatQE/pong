@@ -24,46 +24,62 @@ parser.add_argument("-u", "--url")
 parser.add_argument("-r", "--result-path")
 args = parser.parse_args()
 
-pong_params = download_url(args.url)
-with open("section", "w") as sectioned:
-    with open(pong_params, "r") as pp:
-        sectioned.write("[default]\n")
-        for line in pp.readlines():
-            sectioned.write(line)
+if args.url.startswith("http:"):
+    pong_params = download_url(args.url)
+else:
+    pong_params = args.url
+
+if 0:
+    with open("section", "w") as sectioned:
+        with open(pong_params, "r") as pp:
+            sectioned.write("[default]\n")
+            for line in pp.readlines():
+                sectioned.write(line)
 
 
-cfg = ConfigParser()
-cfg.read(["section"])
+    cfg = ConfigParser()
+    cfg.read(["section"])
 
-cfgget = partial(cfg.get, "default")
+    cfgget = partial(cfg.get, "default")
 
-keys = ["PROJECT_ID", "RESULT_PATH", "ARTIFACT_ARCHIVE", "TESTCASES_QUERY", "REQUIREMENTS_QUERY",
+    keys = ["PROJECT_ID", "RESULT_PATH", "ARTIFACT_ARCHIVE", "TESTCASES_QUERY", "REQUIREMENTS_QUERY",
         "DISTRO", "REQUIREMENT_PREFIX", "TESTCASE_PREFIX",
         "TESTRUN_PREFIX", "TESTRUN_SUFFIX", "TESTRUN_TEMPLATE",
         "TESTRUN_JENKINS_JOBS", "TESTRUN_NOTES"]
+    keys_p = map(lambda k: "P_" + k, keys)
+    keys.remove("TESTRUN_JENKINS_JOBS")
+    keys.append("TESTRUN_JENKINSJOBS")
+
+    def converter(name):
+        if name == "BASE_QUERIES":
+            name = "testcases_query"
+        return "--" + name.replace("_", "-").lower()
+
+    cmd_args = map(converter, keys)
 
 
-def converter(name):
-    if name == "BASE_QUERIES":
-        name = "testcases_query"
-    return "--" + name.replace("_", "-").lower()
+with open(pong_params, "r") as params:
+    lines = params.readlines()
 
-cmd_args = map(converter, keys)
 
-cmdline_args = zip(cmd_args, map(cfgget, keys))
+def composer(kv):
+    key, val = kv
+    val = val.replace("\n", "")
+    key1 = "--" + key[2:].lower().replace("_", "-")
+    if "testrun-jenkins-jobs" in key1:
+        key1 = "--testrun-jenkinsjobs"
+    return key1, val
+
+cmdline_args = map(composer, map(lambda l: l.split("="), lines[1:]))
+# cmdline_args = zip(cmd_args, map(cfgget, keys_p))
+
 arglist = []
 for opts in cmdline_args:
     arglist.extend(opts)
 
-#  We need to add the new requirements if they don't exist
-if 0:
-    arglist.extend(["--testcase-prefix", "RHSM-TC : "])
-    arglist.extend(["--requirement-prefix", "RHSM-REQ : "])
-    arglist.extend(["--requirements-query", "title:RHSM-REQ AND author.id:ci\-user"])
-
 arglist.extend(["--test-case-skips", "True"])
 
-for i,arg in enumerate(arglist):
+for i, arg in enumerate(arglist):
     if arg == "--result-path" and args.result_path is not None:
         arglist[i+1] = args.result_path
         break
