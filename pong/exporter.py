@@ -184,12 +184,10 @@ class Exporter(object):
                 raise Exception("Could not create a new TestRun")
             test_run.status = "inprogress"
 
-            # FIXME: Remove comment when POLARION-925 is fixed
-            if not POLARION_925:
-                test_run.variant = self.transformer.config.distro.variant.lower()
-                test_run.jenkinsjobs = self.transformer.config.testrun_jenkinsjobs
-                test_run.notes = self.transformer.config.testrun_notes
-                test_run.arch = self.transformer.config.distro.arch.replace("_", "")
+            test_run.variant = [self.transformer.config.distro.variant.lower()]
+            test_run.jenkinsjobs = self.transformer.config.testrun_jenkinsjobs
+            test_run.notes = self.transformer.config.testrun_notes
+            test_run.arch = [self.transformer.config.distro.arch.replace("_", "")]
 
             for tc in testngs:
                 tc.create_test_record(test_run, run_by=runner)
