@@ -64,8 +64,8 @@ with open(pong_params, "r") as params:
 
 def composer(kv):
     key, val = kv
-    val = val.replace("\n", "")
-    key1 = "--" + key[2:].lower().replace("_", "-")
+    val = val.replace("\n", "").lstrip()
+    key1 = "--" + key.lower().replace("_", "-")
     if "testrun-jenkins-jobs" in key1:
         key1 = "--testrun-jenkinsjobs"
     return key1, val

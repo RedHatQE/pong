@@ -39,10 +39,10 @@ def clean_req_title(req):
             print "Failed to update {}".format(req.work_item_id)
 
 
-def mark_for_deletion(tc):
-    if "RHSM-TC" in tc.title:
+def mark_for_deletion(tc, tag):
+    if tag in tc.title:
         wi = TestCase(uri=tc.uri)
-        wi.title = "Delete me"
+        wi.title = "stoner-DeleteMe"
         try:
             wi.update()
             print "Changed {} title from {} to {}".format(wi.work_item_id, tc.title, wi.title)

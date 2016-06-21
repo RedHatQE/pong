@@ -246,6 +246,8 @@ class ConfigRecord(PRecord):
     testcase_prefix = field()
     testrun_jenkinsjobs = field()
     testrun_notes = field()
+    testrun_assignee = field()
+    testrun_plannedin = field()
 
     # These are "functions"
     update_run = field()
@@ -442,6 +444,12 @@ class CLIConfigRecord(PRecord):
     testrun_notes = add_field("--testrun-notes", default="",
                               help="A string that will be added to the {testrun-property:notes} custom "
                                    "field of a TestRun")
+    testrun_assignee = add_field("--testrun-assignee", default="",
+                                 help="The user that executes a TestRun. If given, it will override the default from"
+                                      "the TestRun Template value for Assignee")
+    testrun_plannedin = add_field("--testrun-plannedin", default="",
+                                  help="An approprate planned in value from the Polarion Plan (eg RHEL_7_3). If given"
+                                       " it will override the value from the TestRun Template for Planned In")
 
     # These are "functions"
     update_run = add_field("--update-run", default=False,

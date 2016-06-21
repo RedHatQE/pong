@@ -32,6 +32,14 @@ def print_tr(obj, fld):
     print fld, "=", getattr(obj, fld)
 
 
+class PlannedinException(Exception):
+    pass
+
+
+class AssigneeException(Exception):
+    pass
+
+
 class Exporter(object):
     """
     A collection of TestCase objects.
@@ -166,20 +174,35 @@ class Exporter(object):
                 base_name = remove_run(base_name)
                 new_id = base_name + " Run 1"
             log.info("Creating new Test Run ID: {}".format(new_id))
+
+            plannedin = self.transformer.config.testrun_plannedin
+            assignee = self.transformer.config.testrun_assignee
+
             retries = 3
             while retries > 0:
+                retries -= 1
+                if not plannedin:
+                    if hasattr(tr_temp, "plannedin") and tr_temp.plannedin:
+                        plannedin = tr_temp.plannedin
+                    else:
+                        raise PlannedinException("No plannedin value in template or from config")
+                if not assignee:
+                    if hasattr(tr_temp, "assignee") and tr_temp.assignee:
+                        assignee = tr_temp.assignee
+                    else:
+                        raise AssigneeException("No assignee value in template or from config")
                 try:
-                    test_run = TestRun.create(self.project, new_id, template_id)
+                    test_run = TestRun.create(self.project, new_id, template_id, plannedin=plannedin,
+                                              assignee=assignee)
                     break
+                except PlannedinException as pex:
+                    log.error(pex.message)
+                    raise pex
+                except AssigneeException as aex:
+                    log.error(aex.message)
+                    raise aex
                 except Exception as ex:
-                    log.warning("Got exception {}".format(ex))
-                    retries -= 1
-                    log.warning("Manually adding in the plannedin field")
-                    try:
-                        test_run = TestRun.create(self.project, new_id, template_id, plannedin=tr_temp.plannedin)
-                        break
-                    except Exception as ex:
-                        log.warning("Retrying {} more times".format(retries))
+                    log.warning("Retrying {} more times".format(retries))
             else:
                 raise Exception("Could not create a new TestRun")
             test_run.status = "inprogress"
