@@ -39,6 +39,23 @@ reflected = None
 with open(opts.mapping_file, "r") as mapping:
     reflected = toolz.groupby('className', json.load(mapping))
 
+# It seems that we get duplicates in the reflected, so let's remove them
+# Extra Credit:  do this functionally
+refl = {}
+for clazz, items in reflected.items():
+    nameset = []
+    maps = []
+    for m in items:
+        methname = m['methodName']
+        if methname not in nameset:
+            nameset.append(methname)
+            maps.append(m)
+        else:
+            log.warning("Found duplicate {} in {}".format(methname, nameset))
+    refl[clazz] = maps
+reflected = refl
+
+
 mapping = {}
 for class_meth, tc in matched:
     class_prefix = "rhsm.{}.tests.".format(class_meth[0])
@@ -53,12 +70,19 @@ for class_meth, tc in matched:
     if not found:
         log.info("No Polarion test case was found for {}.{}".format(klass,meth))
         continue
-    for ptc in found:
-        fullname = "{}.{}".format(klass, meth)
-        log.info("Found matching test case for {}".format(fullname))
+    ptc = toolz.first(found)
+    fullname = "{}.{}".format(klass, meth)
+    log.info("Found matching test case for {}".format(fullname))
 
-        reqs = [req.work_item_id for req in tc.linked_work_items]
-        mapping[fullname] = {"testcase": tc.work_item_id, "requirements": reqs}
+    reqs = [req.work_item_id for req in tc.linked_work_items]
+    mapping[fullname] = {"testcase": tc.work_item_id, "requirements": reqs}
+
+for clazz, maps in reflected:
+    for m in maps:
+        methname = m['methodName']
+        classname = m['className']
+        if methname not in mapping and m['enabled']:
+            log.warning("{}.{} is enabled, but there is no Polarion TestCase for it".format(classname, methname))
 
 with open("map-file.json", "w") as mapper:
-    json.dump(mapping, mapper)
+    json.dump(mapping, mapper, sort_keys=True, indent=2, separators=(',', ':'))
