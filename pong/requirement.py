@@ -31,12 +31,17 @@ def is_in_requirements(title, requirements):
 
 def create_requirement(project_id, title, description="", reqtype="functional",
                        severity="should_have"):
-    from pylarion.work_item import Requirement
-    req = is_requirement_exists(title)
-    if req:
-        log.info("Found existing Requirement {}".format(req.title))
-        return req
+
+    if True:
+        log.warning("No longer creating a requirement automatically")
+        return None
     else:
-        log.info("Creating a new Requirement: {}".format(title))
-        return Requirement.create(project_id, title, description, severity=severity,
-                                  reqtype=reqtype)
+        from pylarion.work_item import Requirement
+        req = is_requirement_exists(title)
+        if req:
+            log.info("Found existing Requirement {}".format(req.title))
+            return req
+        else:
+            log.info("Creating a new Requirement: {}".format(title))
+            return Requirement.create(project_id, title, description, severity=severity,
+                                      reqtype=reqtype)
