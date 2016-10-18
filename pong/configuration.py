@@ -248,6 +248,7 @@ class ConfigRecord(PRecord):
     testrun_notes = field()
     testrun_assignee = field()
     testrun_plannedin = field()
+    testrun_group_id = field()
 
     # These are "functions"
     update_run = field()
