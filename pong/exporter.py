@@ -211,6 +211,7 @@ class Exporter(object):
             test_run.jenkinsjobs = self.transformer.config.testrun_jenkinsjobs
             test_run.notes = self.transformer.config.testrun_notes
             test_run.arch = [self.transformer.config.distro.arch.replace("_", "")]
+            test_run.group_id = self.transformer.config.testrun_group_id
 
             for tc in testngs:
                 tc.create_test_record(test_run, run_by=runner)

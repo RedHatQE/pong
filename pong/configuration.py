@@ -450,6 +450,8 @@ class CLIConfigRecord(PRecord):
     testrun_plannedin = add_field("--testrun-plannedin", default="",
                                   help="An approprate planned in value from the Polarion Plan (eg RHEL_7_3). If given"
                                        " it will override the value from the TestRun Template for Planned In")
+    testrun_group_id = add_field("--testrun-group-id", default="",
+                                help="Actually used as a build id (for example the package version)")
 
     # These are "functions"
     update_run = add_field("--update-run", default=False,

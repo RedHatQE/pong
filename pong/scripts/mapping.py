@@ -40,24 +40,29 @@ with open(opts.mapping_file, "r") as mapping:
     reflected = toolz.groupby('className', json.load(mapping))
 
 # It seems that we get duplicates in the reflected, so let's remove them
-# Extra Credit:  do this functionally
-refl = {}
-for clazz, items in reflected.items():
-    nameset = []
-    maps = []
-    for m in items:
-        methname = m['methodName']
-        if methname not in nameset:
-            nameset.append(methname)
-            maps.append(m)
-        else:
-            log.warning("Found duplicate {} in {}".format(methname, nameset))
-    refl[clazz] = maps
-reflected = refl
+# Extra Credit:  do this functionally.  Though maybe we should keep the duplicates?
+if 0:
+    refl = {}
+    for clazz, items in reflected.items():
+        nameset = []
+        maps = []
+        qualset = set()
+        for m in items:
+            methname = m['methodName']
+            qual = "{}.{}".format(clazz, methname)
+            if qual not in qualset:
+                nameset.append(methname)
+                qualset.add(qual)
+                maps.append(m)
+            else:
+                log.warning("Found duplicate {} in {}.".format(qual, nameset))
+        refl[clazz] = maps
+    reflected = refl
 
 
-mapping = {}
+mapped = []
 for class_meth, tc in matched:
+    mapping = {}
     class_prefix = "rhsm.{}.tests.".format(class_meth[0])
     klass, meth = class_meth[1].split(".")
     klass = class_prefix + klass
@@ -76,13 +81,21 @@ for class_meth, tc in matched:
 
     reqs = [req.work_item_id for req in tc.linked_work_items]
     mapping[fullname] = {"testcase": tc.work_item_id, "requirements": reqs}
+    mapped.append(mapping)
 
-for clazz, maps in reflected:
+with open("map-file.json", "w") as mapper:
+    json.dump(mapped, mapper, sort_keys=True, indent=2, separators=(',', ':'))
+
+for clazz, maps in reflected.items():
     for m in maps:
         methname = m['methodName']
         classname = m['className']
         if methname not in mapping and m['enabled']:
             log.warning("{}.{} is enabled, but there is no Polarion TestCase for it".format(classname, methname))
 
+s = sorted(mapped, key=lambda x: x.keys()[0])
 with open("map-file.json", "w") as mapper:
-    json.dump(mapping, mapper, sort_keys=True, indent=2, separators=(',', ':'))
+    json.dump(s, mapper, sort_keys=True, indent=2, separators=(',', ':'))
+
+with open("reflected.json", "w") as refl:
+    json.dump(reflected, refl, sort_keys=True, indent=2, separators=(',', ':'))

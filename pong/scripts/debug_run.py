@@ -43,9 +43,8 @@ if 0:
     cfgget = partial(cfg.get, "default")
 
     keys = ["PROJECT_ID", "RESULT_PATH", "ARTIFACT_ARCHIVE", "TESTCASES_QUERY", "REQUIREMENTS_QUERY",
-        "DISTRO", "REQUIREMENT_PREFIX", "TESTCASE_PREFIX",
-        "TESTRUN_PREFIX", "TESTRUN_SUFFIX", "TESTRUN_TEMPLATE",
-        "TESTRUN_JENKINS_JOBS", "TESTRUN_NOTES"]
+            "DISTRO", "REQUIREMENT_PREFIX", "TESTCASE_PREFIX", "TESTRUN_PREFIX", "TESTRUN_SUFFIX", "TESTRUN_TEMPLATE",
+            "TESTRUN_JENKINS_JOBS", "TESTRUN_NOTES", "PLANNED_IN_MILESTONE"]
     keys_p = map(lambda k: "P_" + k, keys)
     keys.remove("TESTRUN_JENKINS_JOBS")
     keys.append("TESTRUN_JENKINSJOBS")
@@ -63,11 +62,23 @@ with open(pong_params, "r") as params:
 
 
 def composer(kv):
+    print kv
+    if len(kv) > 2:
+        first = kv[1]
+        splitted = "=".join(kv[2:])
+        newkv = [kv[0], first + "=" + splitted]
+        kv = newkv
+
     key, val = kv
     val = val.replace("\n", "").lstrip()
     key1 = "--" + key.lower().replace("_", "-")
     if "testrun-jenkins-jobs" in key1:
         key1 = "--testrun-jenkinsjobs"
+    if key1 == "--planned-in-milestone":
+        key1 = "--testrun-plannedin"
+    if key1 == "--testcase-prefix":
+        if val.endswith(":"):
+            val += " "
     return key1, val
 
 cmdline_args = map(composer, map(lambda l: l.split("="), lines[1:]))

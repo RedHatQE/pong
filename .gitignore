@@ -6,3 +6,4 @@
 build/
 pong/docs/_build/
 pong/pong/docs/_build/
+pong/scripts/*.json
