@@ -23,6 +23,8 @@ from pong.decorators import retry, profile
 from pong.parsing import Transformer
 from pong.configuration import kickstart, CLIConfigurator, cli_print
 
+from pylarion.enum_option_id import EnumOptionId
+
 POLARION_925 = True
 OLD_EXPORTER = 0
 TESTING = 0
@@ -207,10 +209,10 @@ class Exporter(object):
                 raise Exception("Could not create a new TestRun")
             test_run.status = "inprogress"
 
-            test_run.variant = [self.transformer.config.distro.variant.lower()]
+            test_run.variant = EnumOptionId(enum_id=self.transformer.config.distro.variant.lower())
             test_run.jenkinsjobs = self.transformer.config.testrun_jenkinsjobs
             test_run.notes = self.transformer.config.testrun_notes
-            test_run.arch = [self.transformer.config.distro.arch.replace("_", "")]
+            test_run.arch = EnumOptionId(enum_id=self.transformer.config.distro.arch.replace("_", ""))
             test_run.group_id = self.transformer.config.testrun_group_id
 
             for tc in testngs:
